@@ -946,7 +946,7 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
       // FIXED NATIVE COORDS NO TRANSLATE
       gsap.set(saraWrapper, { x: 600, y: 500 });
       gsap.set(shopWrapper, { x: 600, y: 200 });
-      gsap.set(techsWrapper, { x: 1130, y: 430 });
+      gsap.set(techsWrapper, { x: 1130, y: 480 });
       gsap.set(customerWrapper, { x: 300, y: 500 });
       gsap.set(deviceRef, { x: 450, y: 500, scale: 1 });
       gsap.set(stickyRef, { x: 1200, y: 220, scale: 0.8, rotation: 5 });
@@ -958,7 +958,7 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
       gsap.set(customerLine, { strokeDasharray: 310, strokeDashoffset: 310 });
       gsap.set(saraArrow, { strokeDasharray: 300, strokeDashoffset: 300 });
 
-      gsap.set(checkingBadge, { x: 750, y: 400, scale: 0.8 });
+      gsap.set(checkingBadge, { x: 660, y: 400, scale: 0.8 });
       gsap.set(notingBadge, { x: 1200, y: 460, scale: 0.8 }); // Lowered so it doesn't clip
       gsap.set(cameraRef.current, {
         scale: 1.27,
@@ -1170,8 +1170,8 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
         .to(
           stickyRef,
           {
-            x: 790,
-            y: 380,
+            x: 720,
+            y: 400,
             scale: 0.2,
             rotation: 8,
             duration: 0.8,
@@ -1204,7 +1204,7 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
         )
         .to(
           stickyRef,
-          { x: 1390, y: 380, scale: 0.1, duration: 1.5, ease: "power3.inOut" },
+          { x: 1310, y: 390, scale: 0.1, duration: 1.5, ease: "power3.inOut" },
           "shelf_time+=0.8",
         )
         .to({}, { duration: 2 }) // Hold before fade
@@ -1442,31 +1442,32 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
             position: "absolute",
             left: 0,
             top: 0,
-            transform: "translate(-50%, -50%)",
           }}
         >
-          <div
-            ref={(el) => (refs.current.techsFloat = el)}
-            style={{
-              willChange: "transform",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.indigo}>Technicians</Badge>
-            <div style={{ display: "flex", gap: 20 }}>
-              <FlowNode
-                title="Tech 1"
-                icon={<PersonIcon />}
-                style={{ minWidth: 150 }}
-              />
-              <FlowNode
-                title="Tech 2"
-                icon={<PersonIcon />}
-                style={{ minWidth: 150 }}
-              />
+          <div style={{ transform: "translate(-50%, -50%)" }}>
+            <div
+              ref={(el) => (refs.current.techsFloat = el)}
+              style={{
+                willChange: "transform",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <Badge colorObj={DS.colors.accent.indigo}>Technicians</Badge>
+              <div style={{ display: "flex", gap: 20 }}>
+                <FlowNode
+                  title="Tech 1"
+                  icon={<PersonIcon />}
+                  style={{ minWidth: 150 }}
+                />
+                <FlowNode
+                  title="Tech 2"
+                  icon={<PersonIcon />}
+                  style={{ minWidth: 150 }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1538,82 +1539,83 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
             left: 0,
             top: 0,
             zIndex: 30,
-            transform: "translate(-50%, -50%)",
           }}
         >
-          <div
-            style={{
-              width: 170,
-              background: "#FEF3C7",
-              border: `1px solid #F59E0B`,
-              borderRadius: 4,
-              padding: "16px 20px",
-              boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
+          <div style={{ transform: "translate(-50%, -50%)" }}>
             <div
               style={{
-                fontSize: 14,
-                color: "#92400E",
-                borderBottom: `2px solid #FCD34D`,
-                paddingBottom: 6,
-                fontWeight: "800",
-                textAlign: "center",
+                width: 170,
+                background: "#FEF3C7",
+                border: `1px solid #F59E0B`,
+                borderRadius: 4,
+                padding: "16px 20px",
+                boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
               }}
             >
-              TICKET #104
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div
-                ref={(el) => (fieldRefs.current[0] = el)}
                 style={{
-                  fontSize: 12,
-                  color: "#B45309",
-                  display: "flex",
-                  justifyContent: "space-between",
+                  fontSize: 14,
+                  color: "#92400E",
+                  borderBottom: `2px solid #FCD34D`,
+                  paddingBottom: 6,
+                  fontWeight: "800",
+                  textAlign: "center",
                 }}
               >
-                <span style={{ fontWeight: 700 }}>Name:</span>{" "}
-                <span style={{ color: "#78350F" }}>John</span>
+                TICKET #104
               </div>
-              <div
-                ref={(el) => (fieldRefs.current[1] = el)}
-                style={{
-                  fontSize: 12,
-                  color: "#B45309",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span style={{ fontWeight: 700 }}>Phone:</span>{" "}
-                <span style={{ color: "#78350F" }}>555-0192</span>
-              </div>
-              <div
-                ref={(el) => (fieldRefs.current[2] = el)}
-                style={{
-                  fontSize: 12,
-                  color: "#B45309",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span style={{ fontWeight: 700 }}>Device:</span>{" "}
-                <span style={{ color: "#78350F" }}>PX-92</span>
-              </div>
-              <div
-                ref={(el) => (fieldRefs.current[3] = el)}
-                style={{
-                  fontSize: 12,
-                  color: "#B45309",
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span style={{ fontWeight: 700 }}>Issue:</span>{" "}
-                <span style={{ color: "#78350F" }}>Screen</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  ref={(el) => (fieldRefs.current[0] = el)}
+                  style={{
+                    fontSize: 12,
+                    color: "#B45309",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>Name:</span>{" "}
+                  <span style={{ color: "#78350F" }}>John</span>
+                </div>
+                <div
+                  ref={(el) => (fieldRefs.current[1] = el)}
+                  style={{
+                    fontSize: 12,
+                    color: "#B45309",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>Phone:</span>{" "}
+                  <span style={{ color: "#78350F" }}>555-0192</span>
+                </div>
+                <div
+                  ref={(el) => (fieldRefs.current[2] = el)}
+                  style={{
+                    fontSize: 12,
+                    color: "#B45309",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>Device:</span>{" "}
+                  <span style={{ color: "#78350F" }}>PX-92</span>
+                </div>
+                <div
+                  ref={(el) => (fieldRefs.current[3] = el)}
+                  style={{
+                    fontSize: 12,
+                    color: "#B45309",
+                    display: "flex",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span style={{ fontWeight: 700 }}>Issue:</span>{" "}
+                  <span style={{ color: "#78350F" }}>Screen</span>
+                </div>
               </div>
             </div>
           </div>
