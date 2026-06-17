@@ -1131,6 +1131,8 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
         )
         .addLabel("noting", "+=1.5")
         .to(checkingBadge, { opacity: 0, y: 390, duration: 0.3 }, "noting")
+
+        // 1. SHOW Noting Badge & Sticky
         .to(
           notingBadge,
           { opacity: 1, y: 370, scale: 1, duration: 0.5, ease: "back.out(2)" },
@@ -1158,7 +1160,29 @@ const Scene2_MeetSaraAndHerRepairShop = () => {
           },
           "noting+=0.6",
         )
-        .addLabel("attach", "+=1.5")
+
+        // 2. ATTACH PHASE (Anchored exactly 2 seconds after Noting)
+        .addLabel("attach", "noting+=2.0")
+
+        // 3. HIDE Noting Badge cleanly right here!
+        .to(notingBadge, { opacity: 0, scale: 0.8, duration: 0.3 }, "attach")
+
+        .to([customerLine, saraArrow], { opacity: 0, duration: 0.5 }, "attach")
+        .to(
+          stickyRef,
+          {
+            x: 790,
+            y: 460,
+            scale: 0.4,
+            rotation: 8,
+            duration: 0.8,
+            ease: "power3.inOut",
+          },
+          "attach+=0.2",
+        )
+
+        // 4. SHELF PHASE
+        .addLabel("shelf_time", "attach+=1.5")
         .to(
           notingBadge,
           { opacity: 1, y: 440, scale: 1, duration: 0.5, ease: "back.out(2)" },
