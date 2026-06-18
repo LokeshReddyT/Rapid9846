@@ -1,4212 +1,2147 @@
-import React, { useEffect, useRef } from "react";
+import React, { useLayoutEffect, useEffect, useRef } from "react";
 import { gsap } from "gsap";
+import { staticFile } from "remotion";
 import {
-  Sequence,
-  AbsoluteFill,
   useCurrentFrame,
   useVideoConfig,
+  Sequence,
+  AbsoluteFill,
+  ScaledStages,
 } from "remotion";
 
-// ── 1. DESIGN TOKENS ────────────────────────────────────────
+// ─── DESIGN SYSTEM ────────────────────────────────────────────────────────
 const DS = {
   colors: {
     bg: "#0B0F19",
     panel: "#0F172A",
     card: "#1E293B",
-    cardElevated: "#243347",
     border: "#334155",
-    borderBright: "#475569",
     textPrimary: "#F8FAFC",
     textSecondary: "#94A3B8",
-    textTertiary: "#64748B",
-    accent: {
-      cyan: {
-        base: "#38BDF8",
-        glow: "rgba(56,189,248,0.15)",
-        bright: "#7DD3FC",
-      },
-      amber: {
-        base: "#FBBF24",
-        glow: "rgba(251,191,36,0.15)",
-        bright: "#FDE68A",
-      },
-      indigo: {
-        base: "#818CF8",
-        glow: "rgba(129,140,248,0.15)",
-        bright: "#A5B4FC",
-      },
-      green: {
-        base: "#34D399",
-        glow: "rgba(52,211,153,0.15)",
-        bright: "#6EE7B7",
-      },
-      rose: {
-        base: "#FB7185",
-        glow: "rgba(251,113,133,0.15)",
-        bright: "#FCA5A5",
-      },
-    },
+    cyan: "#38BDF8",
+    cyanGlow: "rgba(56,189,248,0.2)",
+    purple: "#A78BFA",
+    purpleGlow: "rgba(167,139,250,0.2)",
+    green: "#34D399",
+    greenGlow: "rgba(52,211,153,0.2)",
+    amber: "#FBBF24",
+    rose: "#FB7185",
   },
   font: {
-    family: "'Inter', sans-serif",
-    display: {
-      fontSize: 72,
-      fontWeight: 800,
-      letterSpacing: "-0.03em",
-      color: "#F8FAFC",
-      margin: 0,
-    },
-    h1: {
-      fontSize: 52,
-      fontWeight: 700,
-      letterSpacing: "-0.02em",
-      color: "#F8FAFC",
-      margin: 0,
-      lineHeight: 1.2,
-    },
-    h2: {
-      fontSize: 40,
-      fontWeight: 700,
-      letterSpacing: "-0.02em",
-      color: "#F8FAFC",
-      margin: 0,
-      lineHeight: 1.2,
-    },
-    bodyLg: {
-      fontSize: 22,
-      fontWeight: 400,
-      color: "#94A3B8",
-      lineHeight: 1.6,
-      margin: 0,
-    },
-    label: {
-      fontSize: 13,
-      fontWeight: 600,
-      letterSpacing: "0.06em",
-      color: "#64748B",
-      textTransform: "uppercase",
-      margin: 0,
-    },
+    family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
   },
-  shadows: { card: "0 4px 24px rgba(0,0,0,0.4)" },
   easing: {
-    enter: "power4.out",
-    exit: "power4.in",
+    enter: "power3.out",
+    exit: "power3.in",
     smooth: "power2.inOut",
-    spring: "elastic.out(1, 0.5)",
-    float: "sine.inOut",
-    back: "back.out(2)",
+    spring: "elastic.out(1, 0.8)",
+    slowFlow: "none",
   },
 };
 
-// ── 2. GLOBAL STYLES ────────────────────────────────────────
-const GlobalStyles = () => (
-  <style
-    dangerouslySetInnerHTML={{
-      __html: `
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-      html, body, #root { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; background: ${DS.colors.bg}; font-family: 'Inter', sans-serif; }
-      * { box-sizing: border-box; }
-    `,
-    }}
-  />
-);
-
-// ── 3. PRIMITIVES & ICONS ───────────────────────────────────
-const Badge = React.forwardRef(
-  ({ children, colorObj = DS.colors.accent.cyan, style }, ref) => (
-    <div
-      ref={ref}
+// ─── UTILITY COMPONENTS ───────────────────────────────────────────────────
+const ScaledStage = ({ children }) => {
+  const { width, height } = useVideoConfig();
+  const scale = Math.min(width / 1920, height / 1080);
+  return (
+    <AbsoluteFill
       style={{
-        background: colorObj.glow,
-        border: "1px solid " + colorObj.base,
-        borderRadius: 9999,
-        padding: "4px 12px",
-        color: colorObj.base,
-        ...DS.font.label,
-        whiteSpace: "nowrap",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  ),
-);
-
-const FlowNode = React.forwardRef(
-  ({ title, icon, style, glowColor, iconRef }, ref) => (
-    <div
-      ref={ref}
-      style={{
-        background: DS.colors.card,
-        border: "2px solid " + (glowColor ? glowColor.base : DS.colors.border),
-        borderRadius: 12,
-        minWidth: 200,
-        padding: "12px 24px",
-        display: "flex",
+        backgroundColor: DS.colors.bg,
         alignItems: "center",
-        gap: 12,
-        boxShadow: glowColor
-          ? "0 0 32px " + glowColor.glow + ", 0 0 8px " + glowColor.glow
-          : DS.shadows.card,
-        ...style,
+        justifyContent: "center",
+        fontFamily: DS.font.family,
       }}
     >
-      {icon && (
-        <div
-          ref={iconRef}
-          style={{
-            width: 24,
-            height: 24,
-            flexShrink: 0,
-            fill: glowColor ? glowColor.base : DS.colors.textPrimary,
-          }}
-        >
-          {icon}
-        </div>
-      )}
-      <div
-        style={{
-          ...DS.font.bodyLg,
-          color: DS.colors.textPrimary,
-          fontWeight: 600,
-          whiteSpace: "nowrap",
-          lineHeight: 1,
-        }}
-      >
-        {title}
-      </div>
-    </div>
-  ),
-);
-
-const PuzzleIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path d="M20.5 11h-2V9a2 2 0 0 0-2-2h-2V5.5a2.5 2.5 0 0 0-5 0V7H7.5a2 2 0 0 0-2 2v2h-2a2.5 2.5 0 0 0 0 5h2v2a2 2 0 0 0 2 2h2v2.5a2.5 2.5 0 0 0 5 0V20h2a2 2 0 0 0 2-2v-2h2a2.5 2.5 0 0 0 0-5z" />
-  </svg>
-);
-const PersonIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-  </svg>
-);
-const ShopIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
-  </svg>
-);
-const PhoneIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <rect
-      x="5"
-      y="2"
-      width="14"
-      height="20"
-      rx="2"
-      ry="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <line
-      x1="12"
-      y1="18"
-      x2="12.01"
-      y2="18"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-const LaptopIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <rect
-      x="3"
-      y="4"
-      width="18"
-      height="12"
-      rx="1"
-      ry="1"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <path d="M1 18h22v2H1z" fill="currentColor" />
-  </svg>
-);
-const WrenchIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path
-      d="M22.7 19.3L15 11.6c.3-1.2.1-2.5-.5-3.6-1.3-2.3-4.3-3-6.6-1.7-2.3 1.3-3 4.3-1.7 6.6.9 1.6 2.6 2.4 4.3 2.2l7.7 7.7c.4.4 1 .4 1.4 0l3.1-3.1c.4-.4.4-1 0-1.4zm-14-6.8c-1.1-.6-1.5-2.1-.9-3.2.6-1.1 2.1-1.5 3.2-.9 1.1.6 1.5 2.1.9 3.2-.6 1.1-2.1 1.5-3.2.9z"
-      fill="currentColor"
-    />
-  </svg>
-);
-const WorkbenchIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path d="M2 7h20v4H2zM4 11h4v10H4zM16 11h4v10h-4z" />
-  </svg>
-);
-const CheckIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path
-      d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"
-      fill="currentColor"
-    />
-  </svg>
-);
-const PhoneCallIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path
-      d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 0 0-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"
-      fill="currentColor"
-    />
-  </svg>
-);
-const HappyIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path
-      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4-7.5c.83 0 1.5-.67 1.5-1.5S8.83 10 8 10s-1.5.67-1.5 1.5S7.17 12.5 8 12.5zm8 0c.83 0 1.5-.67 1.5-1.5S16.83 10 16 10s-1.5.67-1.5 1.5.67 1.5 1.5 1.5zm-4 4.5c2.33 0 4.31-1.46 5.11-3.5H8.89c.8 2.04 2.78 3.5 5.11 3.5z"
-      fill="currentColor"
-    />
-  </svg>
-);
-const CloudIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <path
-      d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"
-      fill="currentColor"
-    />
-  </svg>
-);
-const TargetIcon = () => (
-  <svg viewBox="0 0 24 24" width="100%" height="100%">
-    <circle
-      cx="12"
-      cy="12"
-      r="10"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <circle
-      cx="12"
-      cy="12"
-      r="6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <circle cx="12" cy="12" r="2" fill="currentColor" />
-  </svg>
-);
-
-// ── 4. SCENES ───────────────────────────────────────────────
-
-const WelcomeScreen = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({});
-  const masterTl = useRef(null);
-  const idleTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const idle = gsap.timeline({ paused: true });
-      const { glow, panel, welcomeText, title, subtitle, particles } =
-        refs.current;
-
-      gsap.set([panel, welcomeText, title, subtitle, particles], {
-        opacity: 0,
-      });
-      gsap.set(panel, { scale: 0.9 });
-      gsap.set(glow, { opacity: 0, scale: 0.5 });
-      gsap.set([title, subtitle], { y: 20 });
-
-      Array.from(particles.children).forEach((p, i) => {
-        const seed1 = Math.sin(i + 1);
-        const seed2 = Math.cos(i + 1);
-        gsap.set(p, {
-          x: 960 + seed1 * 800,
-          y: 540 + seed2 * 600,
-          scale: Math.abs(seed1) * 1.5 + 0.5,
-          opacity: 0,
-        });
-        idle.to(
-          p,
-          {
-            y: "-=" + (Math.abs(seed2) * 100 + 50),
-            x: "+=" + seed1 * 50,
-            duration: Math.abs(seed1) * 5 + 5,
-            ease: "none",
-            repeat: -1,
-            yoyo: true,
-            force3D: true,
-          },
-          0,
-        );
-      });
-      idle.to(
-        glow,
-        {
-          scale: 1.05,
-          opacity: 0.6,
-          duration: 4,
-          ease: DS.easing.float,
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("intro", "+=0.2")
-        .to(
-          glow,
-          { opacity: 0.5, scale: 1, duration: 2.5, ease: "power2.out" },
-          "intro",
-        )
-        .to(
-          Array.from(particles.children),
-          { opacity: 0.4, duration: 2, stagger: 0.1, ease: "power2.out" },
-          "intro",
-        )
-        .to(
-          panel,
-          { opacity: 1, scale: 1, duration: 1.5, ease: DS.easing.spring },
-          "intro+=0.5",
-        )
-        .to(
-          welcomeText,
-          { opacity: 1, duration: 0.8, ease: "power2.out" },
-          "intro+=0.8",
-        )
-        .addLabel("swap", "+=1.5")
-        .to(
-          welcomeText,
-          { opacity: 0, duration: 0.5, ease: "power2.inOut" },
-          "swap",
-        )
-        .to(
-          title,
-          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-          "swap+=0.5",
-        )
-        .to(
-          subtitle,
-          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-          "swap+=0.8",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          cameraRef.current,
-          { scale: 1.05, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        )
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-      idleTl.current = idle;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-    if (idleTl.current) idleTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{ position: "absolute", width: 1920, height: 1080, opacity: 0 }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          transformOrigin: "center center",
-        }}
-      >
-        <div
-          ref={(el) => (refs.current.glow = el)}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            width: 1200,
-            height: 1200,
-            transform: "translate(-50%, -50%)",
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle, rgba(56,189,248,0.15) 0%, rgba(11,15,25,0) 70%)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          ref={(el) => (refs.current.particles = el)}
-          style={{ position: "absolute", inset: 0 }}
-        >
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                width: 4,
-                height: 4,
-                borderRadius: "50%",
-                background: DS.colors.accent.cyan.bright,
-              }}
-            />
-          ))}
-        </div>
-        <div
-          ref={(el) => (refs.current.panel = el)}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            background: DS.colors.panel,
-            border: "1px solid " + DS.colors.border,
-            borderRadius: 24,
-            padding: "48px 64px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 24,
-            boxShadow: DS.shadows.card,
-            backdropFilter: "blur(12px)",
-            minWidth: 400,
-          }}
-        >
-          <h1
-            ref={(el) => (refs.current.welcomeText = el)}
-            style={{
-              ...DS.font.h1,
-              textAlign: "center",
-              position: "absolute",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Welcome
-          </h1>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <h1
-              ref={(el) => (refs.current.title = el)}
-              style={{
-                ...DS.font.h1,
-                textAlign: "center",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Why Are We Here?
-            </h1>
-            <div
-              ref={(el) => (refs.current.subtitle = el)}
-              style={{
-                ...DS.font.bodyLg,
-                color: DS.colors.accent.cyan.bright,
-                textAlign: "center",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Understanding the Problem
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Scene1_EveryProjectStartsWithAProblem = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({});
-  const masterTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const {
-        problemWrapper,
-        solutionWrapper,
-        arrowBox,
-        shopWrapper,
-        shopLine,
-        badge,
-        caption,
-      } = refs.current;
-
-      gsap.set(
-        [
-          problemWrapper,
-          solutionWrapper,
-          shopWrapper,
-          badge,
-          caption,
-          arrowBox,
-          shopLine,
-        ],
-        { opacity: 0 },
-      );
-      gsap.set(problemWrapper, { x: 960, y: 440, scale: 0.95 });
-      gsap.set(solutionWrapper, { x: 1220, y: 440 });
-      gsap.set(arrowBox, { clipPath: "inset(0 100% 0 0)" });
-      gsap.set(shopLine, { clipPath: "inset(0 0 100% 0)" });
-      gsap.set(shopWrapper, { x: 700, y: 620, scale: 0.9 });
-      gsap.set(caption, { y: 20 });
-      gsap.set(badge, { scale: 0.5, y: 10 });
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("start", "+=0.2")
-        .to(
-          problemWrapper,
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.enter },
-          "start",
-        )
-        .addLabel("focus", "+=0.3")
-        .to(
-          cameraRef.current,
-          { scale: 1.08, y: 20, duration: 1.5, ease: DS.easing.smooth },
-          "focus",
-        )
-        .addLabel("split", "+=0.8")
-        .to(
-          problemWrapper,
-          { x: 700, duration: 1.2, ease: DS.easing.smooth },
-          "split",
-        )
-        .to(
-          solutionWrapper,
-          { opacity: 1, duration: 1.2, ease: DS.easing.smooth },
-          "split",
-        )
-        .to(
-          cameraRef.current,
-          { scale: 1.6, y: -10, duration: 1.8, ease: DS.easing.smooth },
-          "split+=0.2",
-        )
-        .addLabel("arrow", "-=0.4")
-        .to(
-          arrowBox,
-          {
-            opacity: 1,
-            clipPath: "inset(0 0% 0 0)",
-            duration: 1,
-            ease: DS.easing.smooth,
-          },
-          "arrow",
-        )
-        .addLabel("shopReveal", "+=0.4")
-        .to(
-          shopLine,
-          {
-            opacity: 1,
-            clipPath: "inset(0 0 0% 0)",
-            duration: 0.6,
-            ease: "power2.inOut",
-          },
-          "shopReveal",
-        )
-        .to(
-          shopWrapper,
-          { opacity: 1, scale: 1, duration: 0.8, ease: DS.easing.back },
-          "shopReveal+=0.4",
-        )
-        .to(
-          badge,
-          { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: DS.easing.back },
-          "shopReveal+=0.7",
-        )
-        .to(
-          caption,
-          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-          "shopReveal+=1.2",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          cameraRef.current,
-          { scale: 1, y: 0, duration: 1.5, ease: DS.easing.exit },
-          "exit",
-        )
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{ position: "absolute", width: 1920, height: 1080, opacity: 0 }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          transformOrigin: "center center",
-        }}
-      >
-        <div
-          ref={(el) => (refs.current.arrowBox = el)}
-          style={{
-            position: "absolute",
-            left: 810,
-            top: 430,
-            width: 300,
-            height: 20,
-          }}
-        >
-          <svg width="300" height="20" style={{ overflow: "visible" }}>
-            <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="8"
-                markerHeight="6"
-                refX="7"
-                refY="3"
-                orient="auto"
-              >
-                <polygon
-                  points="0 0, 8 3, 0 6"
-                  fill={DS.colors.accent.green.base}
-                />
-              </marker>
-            </defs>
-            <line
-              x1="0"
-              y1="10"
-              x2="290"
-              y2="10"
-              stroke={DS.colors.accent.green.base}
-              strokeWidth="3"
-              markerEnd="url(#arrowhead)"
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
-        <div
-          ref={(el) => (refs.current.shopLine = el)}
-          style={{
-            position: "absolute",
-            left: 698,
-            top: 480,
-            width: 4,
-            height: 70,
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              background: DS.colors.borderBright,
-              borderRadius: 2,
-            }}
-          />
-        </div>
-        <div
-          ref={(el) => (refs.current.problemWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            width: 0,
-            height: 0,
-            opacity: 0,
-            transform: "translate3d(960px, 440px, 0) scale(0.95)",
-            willChange: "transform, opacity",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: -50,
-              left: "50%",
-              transform: "translateX(-50%)",
-              ...DS.font.label,
-              color: DS.colors.textSecondary,
-            }}
-          >
-            PROBLEM
-          </div>
-          <FlowNode
-            title="Missing Piece"
-            icon={<PuzzleIcon />}
-            glowColor={DS.colors.accent.rose}
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              justifyContent: "center",
-            }}
-          />
-        </div>
-        <div
-          ref={(el) => (refs.current.solutionWrapper = el)}
-          style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0 }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: 0,
-              height: 0,
-              opacity: 0,
-              transform: "translate3d(1220px, 440px, 0)",
-              willChange: "transform, opacity",
-            }}
-          >
-            SOLUTION
-          </div>
-          <FlowNode
-            title="Software App"
-            icon={<PuzzleIcon />}
-            glowColor={DS.colors.accent.green}
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              justifyContent: "center",
-            }}
-          />
-        </div>
-        <div
-          ref={(el) => (refs.current.shopWrapper = el)}
-          style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0 }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 64,
-                height: 64,
-                background: DS.colors.cardElevated,
-                borderRadius: 16,
-                padding: 16,
-                border: "1px solid " + DS.colors.border,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fill: DS.colors.textPrimary,
-                boxShadow: DS.shadows.card,
-              }}
-            >
-              <ShopIcon />
-            </div>
-            <Badge
-              ref={(el) => (refs.current.badge = el)}
-              colorObj={DS.colors.accent.amber}
-            >
-              Sara's Story
-            </Badge>
-          </div>
-        </div>
-      </div>
-      <div
-        ref={(el) => (refs.current.caption = el)}
-        style={{
-          position: "absolute",
-          bottom: 60,
-          width: "100%",
-          textAlign: "center",
-          ...DS.font.h2,
-          fontSize: 64,
-          color: DS.colors.textSecondary,
-        }}
-      >
-        Every project begins here.
-      </div>
-    </div>
-  );
-};
-
-const Scene2_MeetSaraAndHerRepairShop = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({});
-  const fieldRefs = useRef([]);
-  const masterTl = useRef(null);
-  const idleTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const idle = gsap.timeline({ paused: true });
-      const validFields = fieldRefs.current.filter(Boolean);
-      const {
-        saraWrapper,
-        saraFloat,
-        shopWrapper,
-        shopFloat,
-        shopLine,
-        techsWrapper,
-        techsFloat,
-        techLine,
-        customerWrapper,
-        customerFloat,
-        customerLine,
-        saraArrow,
-        deviceRef,
-        deviceFloat,
-        checkingBadge,
-        notingBadge,
-        stickyRef,
-        shelfWrapper,
-      } = refs.current;
-
-      gsap.set(
-        [
-          saraWrapper,
-          shopWrapper,
-          techsWrapper,
-          customerWrapper,
-          shelfWrapper,
-          deviceRef,
-          stickyRef,
-          checkingBadge,
-          notingBadge,
-          shopLine,
-          techLine,
-          customerLine,
-          saraArrow,
-        ],
-        { opacity: 0 },
-      );
-
-      // FIXED NATIVE COORDS NO TRANSLATE
-      gsap.set(saraWrapper, { x: 600, y: 500 });
-      gsap.set(shopWrapper, { x: 600, y: 200 });
-      gsap.set(techsWrapper, { x: 1130, y: 480 });
-      gsap.set(customerWrapper, { x: 300, y: 500 });
-      gsap.set(deviceRef, { x: 450, y: 500, scale: 1 });
-      gsap.set(stickyRef, { x: 1200, y: 220, scale: 0.8, rotation: 5 });
-      gsap.set(validFields, { opacity: 0, x: -10 });
-      gsap.set(shelfWrapper, { x: 1400, y: 500 });
-
-      gsap.set(shopLine, { strokeDasharray: 170, strokeDashoffset: 170 });
-      gsap.set(techLine, { strokeDasharray: 460, strokeDashoffset: 460 });
-      gsap.set(customerLine, { strokeDasharray: 310, strokeDashoffset: 310 });
-      gsap.set(saraArrow, { strokeDasharray: 300, strokeDashoffset: 300 });
-
-      gsap.set(checkingBadge, { x: 660, y: 400, scale: 0.8 });
-      gsap.set(notingBadge, { x: 1200, y: 460, scale: 0.8 }); // Lowered so it doesn't clip
-      gsap.set(cameraRef.current, {
-        scale: 1.27,
-        x: 10,
-        y: 120,
-        transformOrigin: "51% 40%",
-      });
-
-      // FORCE 3D ON ALL FLOATS TO PREVENT SHAKING
-      idle.to(
-        saraFloat,
-        {
-          y: 6,
-          duration: 3.5,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        shopFloat,
-        {
-          y: -6,
-          duration: 4.2,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        techsFloat,
-        {
-          y: 5,
-          duration: 3.8,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        customerFloat,
-        {
-          y: -5,
-          duration: 3.2,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        deviceFloat,
-        {
-          y: -4,
-          duration: 2.8,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("intro", "+=0.2")
-        .to(
-          saraWrapper,
-          { opacity: 1, duration: 1.2, ease: "power2.inOut" },
-          "intro",
-        )
-        .addLabel("shop", "+=0.5")
-        .to(
-          shopWrapper,
-          { opacity: 1, duration: 1, ease: "power2.inOut" },
-          "shop",
-        )
-        .to(
-          shopLine,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 0.8,
-            ease: "power2.inOut",
-          },
-          "shop+=0.2",
-        )
-        .addLabel("techs", "+=0.6")
-        .to(
-          techsWrapper,
-          { opacity: 1, duration: 1, ease: "power2.inOut" },
-          "techs",
-        )
-        .to(
-          techLine,
-          {
-            opacity: 0.4,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "techs+=0.2",
-        )
-        .addLabel("clear_for_customer", "+=2")
-        .to(
-          [shopWrapper, techsWrapper, shopLine, techLine],
-          { opacity: 0, duration: 0.8, ease: "power2.inOut" },
-          "clear_for_customer",
-        )
-        .to(
-          saraWrapper,
-          { x: 1200, duration: 1.2, ease: "power3.inOut" },
-          "clear_for_customer+=0.2",
-        )
-        .addLabel("customer_arrives", "+=0.4")
-        .to(
-          customerWrapper,
-          { opacity: 1, duration: 1.2, ease: "power2.inOut" },
-          "customer_arrives",
-        )
-        .to(
-          deviceRef,
-          { opacity: 1, duration: 1.2, ease: "power2.inOut" },
-          "customer_arrives",
-        )
-        .addLabel("checking", "+=0.8")
-        .to(
-          deviceRef,
-          { x: 750, duration: 1.2, ease: "power3.inOut" },
-          "checking",
-        )
-        .to(
-          customerLine,
-          {
-            opacity: 0.4,
-            strokeDashoffset: 0,
-            duration: 1.2,
-            ease: "power3.inOut",
-          },
-          "checking",
-        )
-        .to(
-          saraArrow,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power3.inOut",
-          },
-          "checking+=0.2",
-        )
-        .to(
-          checkingBadge,
-          { opacity: 1, y: 400, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "checking+=0.8",
-        )
-        .addLabel("noting", "+=1.5")
-        .to(checkingBadge, { opacity: 0, y: 390, duration: 0.3 }, "noting")
-
-        // 1. SHOW Noting Badge & Sticky
-        .to(
-          notingBadge,
-          { opacity: 1, y: 370, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "noting+=0.2",
-        )
-        .to(
-          stickyRef,
-          {
-            opacity: 1,
-            scale: 1,
-            rotation: 2,
-            duration: 0.6,
-            ease: "back.out(1.5)",
-          },
-          "noting+=0.2",
-        )
-        .to(
-          validFields,
-          {
-            opacity: 1,
-            x: 0,
-            stagger: 0.15,
-            duration: 0.4,
-            ease: "power2.out",
-          },
-          "noting+=0.6",
-        )
-
-        // 2. ATTACH PHASE (Anchored exactly 2 seconds after Noting)
-        .addLabel("attach", "noting+=2.0")
-
-        // 3. HIDE Noting Badge cleanly right here!
-        .to(notingBadge, { opacity: 0, scale: 0.8, duration: 0.3 }, "attach")
-
-        .to([customerLine, saraArrow], { opacity: 0, duration: 0.5 }, "attach")
-        .to(
-          stickyRef,
-          {
-            x: 790,
-            y: 460,
-            scale: 0.4,
-            rotation: 8,
-            duration: 0.8,
-            ease: "power3.inOut",
-          },
-          "attach+=0.2",
-        )
-
-        // 4. SHELF PHASE
-        .addLabel("shelf_time", "attach+=1.5")
-        .to(
-          notingBadge,
-          { opacity: 1, y: 440, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "noting+=0.2",
-        )
-        .to([customerLine, saraArrow], { opacity: 0, duration: 0.5 }, "attach")
-
-        // FIXED ALIGNMENT
-        .to(
-          stickyRef,
-          {
-            x: 720,
-            y: 400,
-            scale: 0.2,
-            rotation: 8,
-            duration: 0.8,
-            ease: "power3.inOut",
-          },
-          "attach+=0.2",
-        )
-        .addLabel("shelf_time", "attach+=1.5")
-        .to(
-          [customerWrapper, saraWrapper],
-          { opacity: 0, duration: 0.6 },
-          "shelf_time",
-        )
-
-        // ADDED CAMERA PAN
-        .to(
-          cameraRef.current,
-          { x: -450, duration: 1.5, ease: "power3.inOut" },
-          "shelf_time",
-        )
-        .to(
-          shelfWrapper,
-          { opacity: 1, duration: 1, ease: "power2.inOut" },
-          "shelf_time+=0.4",
-        )
-        .to(
-          deviceRef,
-          { x: 1370, y: 480, scale: 0.5, duration: 1.5, ease: "power3.inOut" },
-          "shelf_time+=0.8",
-        )
-        .to(
-          stickyRef,
-          { x: 1310, y: 390, scale: 0.1, duration: 1.5, ease: "power3.inOut" },
-          "shelf_time+=0.8",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-      idleTl.current = idle;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-    if (idleTl.current) idleTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{
-        position: "absolute",
-        width: 1920,
-        height: 1080,
-        overflow: "hidden",
-        opacity: 0,
-      }}
-    >
-      <div
-        ref={cameraRef}
-        style={{ width: "100%", height: "100%", position: "absolute" }}
-      >
-        <svg
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: 1920,
-            height: 1080,
-            pointerEvents: "none",
-          }}
-        >
-          <defs>
-            <marker
-              id="saraArrowhead"
-              markerWidth="8"
-              markerHeight="6"
-              refX="7"
-              refY="3"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 8 3, 0 6"
-                fill={DS.colors.accent.amber.base}
-              />
-            </marker>
-          </defs>
-          <line
-            ref={(el) => (refs.current.shopLine = el)}
-            x1="600"
-            y1="280"
-            x2="600"
-            y2="450"
-            stroke={DS.colors.borderBright}
-            strokeWidth="3"
-            strokeDasharray="6 6"
-            fill="none"
-          />
-          <line
-            ref={(el) => (refs.current.techLine = el)}
-            x1="680"
-            y1="500"
-            x2="1140"
-            y2="500"
-            stroke={DS.colors.borderBright}
-            strokeWidth="3"
-            strokeDasharray="8 8"
-            fill="none"
-          />
-          <line
-            ref={(el) => (refs.current.customerLine = el)}
-            x1="390"
-            y1="500"
-            x2="700"
-            y2="500"
-            stroke={DS.colors.accent.amber.base}
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            fill="none"
-          />
-          <line
-            ref={(el) => (refs.current.saraArrow = el)}
-            x1="800"
-            y1="500"
-            x2="1100"
-            y2="500"
-            stroke={DS.colors.accent.amber.base}
-            strokeWidth="2"
-            strokeDasharray="6 6"
-            markerEnd="url(#saraArrowhead)"
-            fill="none"
-          />
-        </svg>
-
-        <div
-          ref={(el) => (refs.current.checkingBadge = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-            zIndex: 10,
-          }}
-        >
-          <Badge colorObj={DS.colors.accent.amber}>Checking Device...</Badge>
-        </div>
-        <div
-          ref={(el) => (refs.current.notingBadge = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-            zIndex: 10,
-          }}
-        >
-          <Badge colorObj={DS.colors.accent.cyan}>Noting Details...</Badge>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.shopWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.shopFloat = el)}
-            style={{
-              willChange: "transform",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                width: 120,
-                height: 120,
-                background: DS.colors.cardElevated,
-                borderRadius: 20,
-                border: `2px solid ${DS.colors.borderBright}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fill: DS.colors.textSecondary,
-                boxShadow: `0 0 40px ${DS.colors.accent.cyan.glow}`,
-              }}
-            >
-              <div style={{ width: 64, height: 64, opacity: 0.8 }}>
-                <ShopIcon />
-              </div>
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: -10,
-                  left: -10,
-                  width: 36,
-                  height: 36,
-                  background: DS.colors.panel,
-                  borderRadius: 8,
-                  border: `1px solid ${DS.colors.borderBright}`,
-                  padding: 6,
-                  color: DS.colors.accent.amber.base,
-                  boxShadow: DS.shadows.card,
-                }}
-              >
-                <PhoneIcon />
-              </div>
-              <div
-                style={{
-                  position: "absolute",
-                  top: -10,
-                  right: -14,
-                  width: 44,
-                  height: 32,
-                  background: DS.colors.panel,
-                  borderRadius: 8,
-                  border: `1px solid ${DS.colors.borderBright}`,
-                  padding: 5,
-                  color: DS.colors.accent.green.base,
-                  boxShadow: DS.shadows.card,
-                }}
-              >
-                <LaptopIcon />
-              </div>
-            </div>
-            <Badge colorObj={DS.colors.accent.cyan}>Sara's Shop</Badge>
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.saraWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.saraFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Sara"
-              icon={<PersonIcon />}
-              glowColor={DS.colors.accent.cyan}
-              style={{ minWidth: 160, justifyContent: "center" }}
-            />
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.techsWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-          }}
-        >
-          <div style={{ transform: "translate(-50%, -50%)" }}>
-            <div
-              ref={(el) => (refs.current.techsFloat = el)}
-              style={{
-                willChange: "transform",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 16,
-              }}
-            >
-              <Badge colorObj={DS.colors.accent.indigo}>Technicians</Badge>
-              <div style={{ display: "flex", gap: 20 }}>
-                <FlowNode
-                  title="Tech 1"
-                  icon={<PersonIcon />}
-                  style={{ minWidth: 150 }}
-                />
-                <FlowNode
-                  title="Tech 2"
-                  icon={<PersonIcon />}
-                  style={{ minWidth: 150 }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.customerWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.customerFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Customer"
-              icon={<PersonIcon />}
-              glowColor={DS.colors.accent.amber}
-              style={{ minWidth: 180, justifyContent: "center" }}
-            />
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.deviceRef = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 20,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.deviceFloat = el)}
-            style={{
-              willChange: "transform",
-              width: 80,
-              height: 80,
-              background: DS.colors.card,
-              borderRadius: 16,
-              border: `2px solid ${DS.colors.accent.amber.base}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fill: DS.colors.textPrimary,
-              boxShadow: `0 0 24px ${DS.colors.accent.amber.glow}`,
-            }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                color: DS.colors.accent.amber.base,
-              }}
-            >
-              <PhoneIcon />
-            </div>
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.stickyRef = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 30,
-          }}
-        >
-          <div style={{ transform: "translate(-50%, -50%)" }}>
-            <div
-              style={{
-                width: 170,
-                background: "#FEF3C7",
-                border: `1px solid #F59E0B`,
-                borderRadius: 4,
-                padding: "16px 20px",
-                boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 14,
-                  color: "#92400E",
-                  borderBottom: `2px solid #FCD34D`,
-                  paddingBottom: 6,
-                  fontWeight: "800",
-                  textAlign: "center",
-                }}
-              >
-                TICKET #104
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div
-                  ref={(el) => (fieldRefs.current[0] = el)}
-                  style={{
-                    fontSize: 12,
-                    color: "#B45309",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>Name:</span>{" "}
-                  <span style={{ color: "#78350F" }}>John</span>
-                </div>
-                <div
-                  ref={(el) => (fieldRefs.current[1] = el)}
-                  style={{
-                    fontSize: 12,
-                    color: "#B45309",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>Phone:</span>{" "}
-                  <span style={{ color: "#78350F" }}>555-0192</span>
-                </div>
-                <div
-                  ref={(el) => (fieldRefs.current[2] = el)}
-                  style={{
-                    fontSize: 12,
-                    color: "#B45309",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>Device:</span>{" "}
-                  <span style={{ color: "#78350F" }}>PX-92</span>
-                </div>
-                <div
-                  ref={(el) => (fieldRefs.current[3] = el)}
-                  style={{
-                    fontSize: 12,
-                    color: "#B45309",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>Issue:</span>{" "}
-                  <span style={{ color: "#78350F" }}>Screen</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.shelfWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            opacity: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 220,
-              height: 280,
-              background: DS.colors.panel,
-              borderRadius: 16,
-              border: `2px solid ${DS.colors.borderBright}`,
-              display: "flex",
-              flexDirection: "column",
-              padding: "32px 20px",
-              gap: 50,
-              boxShadow: DS.shadows.card,
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-          </div>
-          <Badge
-            colorObj={DS.colors.accent.green}
-            style={{
-              position: "absolute",
-              top: -50,
-              left: "50%",
-              transform: "translateX(-50%)",
-            }}
-          >
-            Waiting Repairs
-          </Badge>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Scene3_TheWorkflowWorksSmoothly = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({});
-  const masterTl = useRef(null);
-  const idleTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const idle = gsap.timeline({ paused: true });
-      const {
-        shelfWrapper,
-        shelfFloat,
-        techWrapper,
-        techFloat,
-        workbenchRef,
-        saraWrapper,
-        saraFloat,
-        customerWrapper,
-        customerFloat,
-        movingDevice,
-        toolsWrapper,
-        checkBadge,
-        happyBadge,
-        lineShelfTech,
-        lineTechSara,
-        lineSaraCustomer,
-        badgeShelfTech,
-        badgeTechSara,
-        badgeSaraCustomer,
-        notificationIcon,
-        captionText,
-        staticDevice1,
-        staticDevice2,
-      } = refs.current;
-
-      gsap.set(
-        [
-          shelfWrapper,
-          techWrapper,
-          saraWrapper,
-          customerWrapper,
-          workbenchRef,
-          movingDevice,
-          toolsWrapper,
-          checkBadge,
-          happyBadge,
-          notificationIcon,
-          captionText,
-          badgeShelfTech,
-          badgeTechSara,
-          badgeSaraCustomer,
-          staticDevice1,
-          staticDevice2,
-        ],
-        { opacity: 0 },
-      );
-      gsap.set(cameraRef.current, {
-        scale: 1.26,
-        x: 30,
-        y: -20,
-        transformOrigin: "center center",
-      });
-
-      gsap.set([lineShelfTech, lineTechSara, lineSaraCustomer], { opacity: 0 });
-      gsap.set(lineShelfTech, { strokeDasharray: 300, strokeDashoffset: 300 });
-      gsap.set(lineTechSara, { strokeDasharray: 1200, strokeDashoffset: 1200 });
-      gsap.set(lineSaraCustomer, {
-        strokeDasharray: 350,
-        strokeDashoffset: 350,
-      });
-
-      gsap.set(shelfWrapper, { x: 960, y: 500 });
-      gsap.set(techWrapper, { x: 1550, y: 500 });
-      gsap.set(workbenchRef, { x: 1400, y: 640 });
-      gsap.set(saraWrapper, { x: 400, y: 450 });
-      gsap.set(customerWrapper, { x: 400, y: 750 });
-      gsap.set(movingDevice, { x: 960, y: 500, scale: 0.6 });
-      gsap.set(staticDevice1, { x: 960, y: 410, scale: 0.6 });
-      gsap.set(staticDevice2, { x: 960, y: 590, scale: 0.6 });
-      gsap.set(toolsWrapper, { x: 1400, y: 640, scale: 0 });
-      gsap.set(checkBadge, { x: 1400, y: 560, scale: 0.5 });
-      gsap.set(notificationIcon, { x: 400, y: 520, scale: 0.5 });
-      gsap.set(happyBadge, { x: 540, y: 680, scale: 0.5 });
-      gsap.set(captionText, { y: 20 });
-      gsap.set(stageRef.current, { opacity: 1 });
-
-      idle.to(
-        shelfFloat,
-        {
-          y: "+=4",
-          duration: 3.5,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        techFloat,
-        {
-          y: "-=5",
-          duration: 3.2,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        saraFloat,
-        {
-          y: "+=6",
-          duration: 3.8,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-      idle.to(
-        customerFloat,
-        {
-          y: "-=5",
-          duration: 3.4,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("start", "+=0.2")
-        .to(
-          [shelfWrapper, staticDevice1, staticDevice2, movingDevice],
-          { opacity: 1, duration: 1.2, ease: "power2.inOut", stagger: 0.1 },
-          "start",
-        )
-        .addLabel("tech", "start+=1.6") // FIXED RELATIVE TIMING
-        .to(
-          techWrapper,
-          { opacity: 1, x: 1400, duration: 1.2, ease: "power3.out" },
-          "tech",
-        )
-        .to(
-          workbenchRef,
-          { opacity: 1, duration: 1, ease: "power2.out" },
-          "tech+=0.4",
-        )
-        .addLabel("arrow1", "tech+=1.4")
-        .to(
-          lineShelfTech,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "arrow1",
-        )
-
-        // FIXED MARCHING ANTS
-        .set(lineShelfTech, { strokeDasharray: "8 8" }, "arrow1+=1")
-        .to(
-          lineShelfTech,
-          { strokeDashoffset: -1000, duration: 50, ease: "none" },
-          "arrow1+=1",
-        ) // Long duration to prevent stopping
-
-        .to(
-          badgeShelfTech,
-          { opacity: 1, y: -10, duration: 0.5, ease: "back.out(2)" },
-          "arrow1+=0.5",
-        )
-        .addLabel("move1", "arrow1+=1.5") // FIXED
-        .to(
-          movingDevice,
-          { x: 1400, y: 640, scale: 0.8, duration: 1.5, ease: "power3.inOut" },
-          "move1",
-        )
-        .addLabel("repair", "move1+=1.5") // FIXED
-        .to(
-          toolsWrapper,
-          { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.5)" },
-          "repair",
-        )
-        .to(
-          toolsWrapper,
-          { rotation: 360, duration: 1.5, ease: "power2.inOut" },
-          "repair+=0.2",
-        )
-        .addLabel("done", "repair+=1.7") // FIXED
-        .to(toolsWrapper, { opacity: 0, duration: 0.3 }, "done")
-        .to(
-          checkBadge,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "done+=0.2",
-        )
-        .addLabel("sara", "done+=0.8") // FIXED
-        .to(
-          saraWrapper,
-          { opacity: 1, duration: 1, ease: "power2.inOut" },
-          "sara",
-        )
-        .to(
-          lineTechSara,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1.5,
-            ease: "power2.inOut",
-          },
-          "sara+=0.4",
-        )
-
-        // FIXED MARCHING ANTS
-        .set(lineTechSara, { strokeDasharray: "6 6" }, "sara+=1.9")
-        .to(
-          lineTechSara,
-          { strokeDashoffset: -1000, duration: 50, ease: "none" },
-          "sara+=1.9",
-        )
-
-        .to(
-          badgeTechSara,
-          { opacity: 1, y: 60, duration: 0.5, ease: "back.out(2)" },
-          "sara+=1.2",
-        )
-        .addLabel("customer", "sara+=2.5") // FIXED
-        .to(
-          customerWrapper,
-          { opacity: 1, duration: 1, ease: "power2.inOut" },
-          "customer",
-        )
-        .to(
-          lineSaraCustomer,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "customer+=0.4",
-        )
-
-        // FIXED MARCHING ANTS
-        .set(lineSaraCustomer, { strokeDasharray: "6 6" }, "customer+=1.4")
-        .to(
-          lineSaraCustomer,
-          { strokeDashoffset: -1000, duration: 50, ease: "none" },
-          "customer+=1.4",
-        )
-
-        .to(
-          badgeSaraCustomer,
-          { opacity: 1, y: -10, duration: 0.5, ease: "back.out(2)" },
-          "customer+=0.8",
-        )
-        .addLabel("notify", "customer+=2.0") // FIXED
-        .to(notificationIcon, { opacity: 1, scale: 1, duration: 0.3 }, "notify")
-        .to(
-          notificationIcon,
-          { y: 650, duration: 1.2, ease: "power2.inOut" },
-          "notify+=0.3",
-        )
-        // Smoothly move the device to the customer instead of teleporting it
-        .to(
-          movingDevice,
-          { x: 540, y: 750, duration: 1.2, ease: "power3.inOut" },
-          "notify+=0.3",
-        )
-        .to(notificationIcon, { opacity: 0, duration: 0.2 }, "notify+=1.5")
-        .to(
-          happyBadge,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "notify+=1.6",
-        )
-
-        .addLabel("finale", "notify+=2.5") // FIXED
-        .to(
-          captionText,
-          { opacity: 1, y: 0, duration: 1, ease: "power3.out" },
-          "finale",
-        )
-        .to(
-          cameraRef.current,
-          { scale: 1.15, y: -30, duration: 4, ease: "power2.inOut" },
-          "finale",
-        )
-        .addLabel("exit", "finale+=4.0") // FIXED
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-      idleTl.current = idle;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-    if (idleTl.current) idleTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{
-        position: "absolute",
-        width: 1920,
-        height: 1080,
-        overflow: "hidden",
-        opacity: 0,
-      }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          transformOrigin: "center center",
-        }}
-      >
-        <svg
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: 1920,
-            height: 1080,
-            pointerEvents: "none",
-          }}
-        >
-          <defs>
-            <marker
-              id="arrowNext"
-              markerWidth="8"
-              markerHeight="6"
-              refX="7"
-              refY="3"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 8 3, 0 6"
-                fill={DS.colors.accent.amber.base}
-              />
-            </marker>
-          </defs>
-          <line
-            ref={(el) => (refs.current.lineShelfTech = el)}
-            x1="1090"
-            y1="500"
-            x2="1300"
-            y2="500"
-            stroke={DS.colors.accent.amber.base}
-            strokeWidth="3"
-            markerEnd="url(#arrowNext)"
-            fill="none"
-          />
-          <path
-            ref={(el) => (refs.current.lineTechSara = el)}
-            d="M 1400 450 Q 900 150 400 450"
-            stroke={DS.colors.accent.green.base}
-            strokeWidth="3"
-            fill="none"
-          />
-          <line
-            ref={(el) => (refs.current.lineSaraCustomer = el)}
-            x1="400"
-            y1="500"
-            x2="400"
-            y2="700"
-            stroke={DS.colors.accent.cyan.base}
-            strokeWidth="3"
-            fill="none"
-          />
-        </svg>
-
-        <div
-          ref={(el) => (refs.current.badgeShelfTech = el)}
-          style={{
-            position: "absolute",
-            left: 1195,
-            top: 460,
-            transform: "translate(-50%, -50%)",
-            zIndex: 10,
-          }}
-        >
-          <Badge colorObj={DS.colors.accent.amber}>Next Device</Badge>
-        </div>
-        <div
-          ref={(el) => (refs.current.badgeTechSara = el)}
-          style={{
-            position: "absolute",
-            left: 900,
-            top: 150,
-            transform: "translate(-50%, -50%)",
-            zIndex: 10,
-          }}
-        >
-          <Badge colorObj={DS.colors.accent.green}>Repair Complete</Badge>
-        </div>
-        <div
-          ref={(el) => (refs.current.badgeSaraCustomer = el)}
-          style={{
-            position: "absolute",
-            left: 500,
-            top: 600,
-            transform: "translate(-50%, -50%)",
-            zIndex: 10,
-          }}
-        >
-          <Badge colorObj={DS.colors.accent.cyan}>Customer Notified</Badge>
-        </div>
-
-        {/* Separated Transforms for Stability */}
-        <div
-          ref={(el) => (refs.current.shelfWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.shelfFloat = el)}
-            style={{
-              willChange: "transform",
-              width: 220,
-              height: 280,
-              background: DS.colors.panel,
-              borderRadius: 16,
-              border: `2px solid ${DS.colors.borderBright}`,
-              display: "flex",
-              flexDirection: "column",
-              padding: "32px 20px",
-              gap: 50,
-              boxShadow: DS.shadows.card,
-            }}
-          >
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                height: 4,
-                background: DS.colors.borderBright,
-                borderRadius: 2,
-              }}
-            />
-            <Badge
-              colorObj={DS.colors.accent.amber}
-              style={{
-                position: "absolute",
-                top: -50,
-                left: "50%",
-                transform: "translateX(-50%)",
-              }}
-            >
-              Repair Queue
-            </Badge>
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.staticDevice1 = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 5,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div style={{ position: "relative", width: 60, height: 60 }}>
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: DS.colors.card,
-                borderRadius: 12,
-                border: `1px solid ${DS.colors.borderBright}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: DS.colors.textSecondary,
-              }}
-            >
-              <div style={{ width: 24, height: 24 }}>
-                <PhoneIcon />
-              </div>
-            </div>
-            <div
-              style={{
-                position: "absolute",
-                top: -8,
-                right: -8,
-                width: 24,
-                height: 24,
-                background: "#FEF3C7",
-                border: "1px solid #F59E0B",
-                borderRadius: 4,
-                zIndex: 2,
-                transform: "rotate(10deg)",
-              }}
-            />
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.staticDevice2 = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 5,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div style={{ position: "relative", width: 60, height: 60 }}>
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: DS.colors.card,
-                borderRadius: 12,
-                border: `1px solid ${DS.colors.borderBright}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: DS.colors.textSecondary,
-              }}
-            >
-              <div style={{ width: 24, height: 24 }}>
-                <PhoneIcon />
-              </div>
-            </div>
-            <div
-              style={{
-                position: "absolute",
-                top: -8,
-                right: -8,
-                width: 24,
-                height: 24,
-                background: "#FEF3C7",
-                border: "1px solid #F59E0B",
-                borderRadius: 4,
-                zIndex: 2,
-                transform: "rotate(-5deg)",
-              }}
-            />
-          </div>
-        </div>
-
-        <div
-          ref={(el) => (refs.current.techWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.techFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Technician"
-              icon={<PersonIcon />}
-              glowColor={DS.colors.accent.indigo}
-              style={{ minWidth: 160 }}
-            />
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.workbenchRef = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 140,
-              height: 90,
-              background: DS.colors.cardElevated,
-              borderRadius: 16,
-              border: `1px solid ${DS.colors.border}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fill: DS.colors.textTertiary,
-              boxShadow: DS.shadows.card,
-            }}
-          >
-            <div style={{ width: 56, height: 56 }}>
-              <WorkbenchIcon />
-            </div>
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.saraWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.saraFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Sara"
-              icon={<PersonIcon />}
-              glowColor={DS.colors.accent.cyan}
-              style={{ minWidth: 160 }}
-            />
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.customerWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.customerFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Customer"
-              icon={<PersonIcon />}
-              style={{ minWidth: 160 }}
-            />
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.movingDevice = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 20,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div style={{ position: "relative", width: 80, height: 80 }}>
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: DS.colors.card,
-                borderRadius: 16,
-                border: `2px solid ${DS.colors.accent.amber.base}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: DS.colors.accent.amber.base,
-                boxShadow: `0 0 20px ${DS.colors.accent.amber.glow}`,
-              }}
-            >
-              <div style={{ width: 40, height: 40 }}>
-                <PhoneIcon />
-              </div>
-            </div>
-            <div
-              style={{
-                position: "absolute",
-                top: -12,
-                right: -12,
-                width: 32,
-                height: 32,
-                background: "#FEF3C7",
-                border: "1px solid #F59E0B",
-                borderRadius: 4,
-                zIndex: 2,
-                transform: "rotate(8deg)",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-              }}
-            />
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.toolsWrapper = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 25,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div style={{ width: 120, height: 120 }}>
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: 32,
-                height: 32,
-                color: DS.colors.textSecondary,
-                background: DS.colors.panel,
-                borderRadius: 8,
-                padding: 4,
-                border: `1px solid ${DS.colors.borderBright}`,
-              }}
-            >
-              <WrenchIcon />
-            </div>
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.checkBadge = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 30,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              background: DS.colors.accent.green.base,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.bg,
-              boxShadow: `0 0 24px ${DS.colors.accent.green.glow}`,
-            }}
-          >
-            <div style={{ width: 28, height: 28 }}>
-              <CheckIcon />
-            </div>
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.notificationIcon = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 30,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              background: DS.colors.panel,
-              border: `2px solid ${DS.colors.accent.cyan.base}`,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.accent.cyan.base,
-              boxShadow: `0 0 16px ${DS.colors.accent.cyan.glow}`,
-            }}
-          >
-            <div style={{ width: 24, height: 24 }}>
-              <PhoneCallIcon />
-            </div>
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.happyBadge = el)}
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            zIndex: 30,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              background: DS.colors.bg,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.accent.green.base,
-            }}
-          >
-            <div style={{ width: 32, height: 32 }}>
-              <HappyIcon />
-            </div>
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.captionText = el)}
-          style={{
-            position: "absolute",
-            bottom: 120,
-            width: "100%",
-            textAlign: "center",
-            ...DS.font.h2,
-            color: DS.colors.textSecondary,
-          }}
-        >
-          Everything runs smoothly right?
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Scene4_SuccessCreatesPressure = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({
-    shelf: null,
-    sara: null,
-    saraFloat: null,
-    caption: null,
-    customers: [],
-  });
-  const masterTl = useRef(null);
-  const idleTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const idle = gsap.timeline({ paused: true });
-      const validCustomers = refs.current.customers.filter(Boolean);
-
-      gsap.set(refs.current.shelf, { opacity: 0, scale: 0.9 });
-      gsap.set(refs.current.sara, {
-        opacity: 0,
-        filter: "drop-shadow(0 0 0px transparent)",
-      });
-      gsap.set(refs.current.caption, { opacity: 0, y: 20 });
-      gsap.set(validCustomers, { opacity: 0, scale: 0 });
-      gsap.set(cameraRef.current, {
-        scale: 1.4,
-        x: 230,
-        y: -20,
-        transformOrigin: "center center",
-      });
-
-      idle.to(
-        refs.current.saraFloat,
-        {
-          y: 8,
-          duration: 3.5,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("start", "+=0.2")
-        .to(
-          refs.current.shelf,
-          { opacity: 1, scale: 1, duration: 1, ease: "power4.out" },
-          "start",
-        )
-        .to(refs.current.sara, { opacity: 1, duration: 1 }, "start+=0.3")
-        .addLabel("chaos", "+=0.8")
-        .to(
-          validCustomers,
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 0.5,
-            stagger: 0.15,
-            ease: "back.out(1.7)",
-          },
-          "chaos",
-        )
-        .to(
-          refs.current.sara,
-          {
-            filter: `drop-shadow(0 0 20px ${DS.colors.accent.rose.base})`,
-            duration: 1,
-          },
-          "chaos+=1",
-        )
-        .addLabel("caption", "+=0.5")
-        .to(
-          refs.current.caption,
-          { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-          "caption",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-      idleTl.current = idle;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-    if (idleTl.current) idleTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{
-        position: "absolute",
-        width: 1920,
-        height: 1080,
-        overflow: "hidden",
-        opacity: 0,
-      }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          transformOrigin: "center center",
-        }}
-      >
-        <div
-          ref={(el) => (refs.current.sara = el)}
-          style={{
-            position: "absolute",
-            left: 300,
-            top: 500,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            ref={(el) => (refs.current.saraFloat = el)}
-            style={{ willChange: "transform" }}
-          >
-            <FlowNode
-              title="Sara"
-              icon={<PersonIcon />}
-              glowColor={DS.colors.accent.cyan}
-            />
-          </div>
-        </div>
-        <div
-          ref={(el) => (refs.current.shelf = el)}
-          style={{
-            position: "absolute",
-            left: 760,
-            top: 250,
-            width: 400,
-            height: 500,
-            background: DS.colors.panel,
-            border: `2px solid ${DS.colors.borderBright}`,
-            borderRadius: 16,
-            padding: 24,
-          }}
-        >
-          <Badge
-            colorObj={DS.colors.accent.rose}
-            style={{ margin: "0 auto 20px", width: "max-content" }}
-          >
-            Overwhelmed Queue
-          </Badge>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 8,
-            }}
-          >
-            {Array.from({ length: 25 }).map((_, i) => (
-              <div
-                key={i}
-                ref={(el) => (refs.current.customers[i] = el)}
-                style={{
-                  width: 60,
-                  height: 60,
-                  background: DS.colors.cardElevated,
-                  border: `1px solid ${DS.colors.accent.rose.base}`,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    color: DS.colors.accent.rose.base,
-                  }}
-                >
-                  <PhoneIcon />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div
-        ref={(el) => (refs.current.caption = el)}
-        style={{
-          position: "absolute",
-          bottom: 120,
-          width: "100%",
-          textAlign: "center",
-          ...DS.font.h2,
-          fontSize: 64,
-          color: DS.colors.textPrimary,
-        }}
-      >
-        But success brings pressure. And the system...{" "}
-        <span style={{ color: DS.colors.accent.rose.base }}>
-          begins to fail.
-        </span>
-      </div>
-    </div>
-  );
-};
-
-const Scene5_TheStickyNoteSystemBreaksDown = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const saraRef = useRef(null);
-  const cardRef = useRef(null);
-  const realizationRef = useRef(null);
-  const pointsRefs = useRef([]);
-  const masterTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const validPoints = pointsRefs.current.filter(Boolean);
-
-      gsap.set(
-        [
-          saraRef.current,
-          cardRef.current,
-          ...validPoints,
-          realizationRef.current,
-        ],
-        { opacity: 0 },
-      );
-      gsap.set([saraRef.current, cardRef.current], { y: 30 });
-      gsap.set(realizationRef.current, { scale: 0.9, y: 20 });
-      gsap.set(cameraRef.current, {
-        scale: 1.35,
-        transformOrigin: "center center",
-      });
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("start", "+=0.2")
-        .to(
-          saraRef.current,
-          { opacity: 1, y: 0, duration: 1, ease: "power2.out" },
-          "start",
-        )
-        .to(
-          cardRef.current,
-          { opacity: 1, y: 0, duration: 1, ease: "power4.out" },
-          "start+=0.2",
-        )
-        .to(
-          validPoints,
-          { opacity: 1, x: 0, duration: 0.8, stagger: 0.2, ease: "power2.out" },
-          "start+=0.5",
-        )
-        .addLabel("realization", "+=2")
-        .to(
-          realizationRef.current,
-          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "back.out(2)" },
-          "realization",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{
-        position: "absolute",
-        width: 1920,
-        height: 1080,
-        overflow: "hidden",
-        opacity: 0,
-      }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 100,
-        }}
-      >
-        <div ref={saraRef}>
-          <FlowNode
-            title="Sara"
-            icon={<PersonIcon />}
-            glowColor={DS.colors.accent.rose}
-          />
-        </div>
-        <div
-          ref={cardRef}
-          style={{
-            background: DS.colors.panel,
-            border: `2px solid ${DS.colors.borderBright}`,
-            borderRadius: 24,
-            padding: 48,
-            width: 700,
-            boxShadow: DS.shadows.card,
-          }}
-        >
-          <h2
-            style={{
-              ...DS.font.h2,
-              marginBottom: 32,
-              color: DS.colors.accent.rose.base,
-            }}
-          >
-            System Breakdown
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {[
-              "Tracking the progress of repairs became impossible with so many devices.",
-              "Sara can’t give clear updates when customers call.",
-              "Sticky notes became difficult to track, resulting in errors.",
-              "Customer satisfaction is dropping due to lack of clear communication.",
-            ].map((text, i) => (
-              <div
-                key={i}
-                ref={(el) => (pointsRefs.current[i] = el)}
-                style={{ display: "flex", alignItems: "flex-start", gap: 16 }}
-              >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: DS.colors.accent.rose.base,
-                    marginTop: 10,
-                    flexShrink: 0,
-                  }}
-                />
-                <p
-                  style={{
-                    ...DS.font.bodyLg,
-                    margin: 0,
-                    color: DS.colors.textPrimary,
-                  }}
-                >
-                  {text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div
-          ref={realizationRef}
-          style={{
-            position: "absolute",
-            bottom: 150,
-            textAlign: "center",
-            background: DS.colors.accent.indigo.glow,
-            border: `1px solid ${DS.colors.accent.indigo.base}`,
-            padding: "24px 48px",
-            borderRadius: 9999,
-          }}
-        ></div>
-      </div>
-    </div>
-  );
-};
-
-const Scene6_TheTransformationAndConclusion = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const stageRef = useRef(null);
-  const cameraRef = useRef(null);
-  const refs = useRef({});
-  const masterTl = useRef(null);
-  const idleTl = useRef(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      const idle = gsap.timeline({ paused: true });
-      const {
-        p1Wrapper,
-        p1Sara,
-        p1SaraFloat,
-        p1Cloud,
-        p1Chaos,
-        p1AppIcon,
-        p1Badge,
-        p1Caption,
-        p2Wrapper,
-        p2AppCard,
-        p2AppFloat,
-        p2AppStatusInProg,
-        p2AppStatusDone,
-        p2Sara,
-        p2SaraFloat,
-        p2Techs,
-        p2TechsFloat,
-        p2LineLog,
-        p2LineLive,
-        p2LineWork,
-        p2LineUpdate,
-        p2BadgeLog,
-        p2BadgeLive,
-        p2BadgeWork,
-        p2BadgeUpdate,
-        p2Caption,
-        p2FlyLog,
-        p2FlyWork,
-        p2FlyUpdate,
-        p2FlyLive,
-        p3Wrapper,
-        p3ProblemBox,
-        p3ProblemFloat,
-        p3SolutionBox,
-        p3SolutionFloat,
-        p3RoadmapPathTop,
-        p3RoadmapPathMid,
-        p3RoadmapPathBot,
-        p3Target,
-        p3TargetBadge,
-        p3Caption,
-      } = refs.current;
-
-      gsap.set(
-        [
-          p1Wrapper,
-          p2Wrapper,
-          p3Wrapper,
-          p1Sara,
-          p1Cloud,
-          p1AppIcon,
-          p1Badge,
-          p1Caption,
-          p2AppCard,
-          p2Sara,
-          p2Techs,
-          p2AppStatusDone,
-          p2LineLog,
-          p2LineLive,
-          p2LineWork,
-          p2LineUpdate,
-          p2BadgeLog,
-          p2BadgeLive,
-          p2BadgeWork,
-          p2BadgeUpdate,
-          p2Caption,
-          p2FlyLog,
-          p2FlyWork,
-          p2FlyUpdate,
-          p2FlyLive,
-          p3ProblemBox,
-          p3SolutionBox,
-          p3Target,
-          p3TargetBadge,
-          p3Caption,
-        ],
-        { opacity: 0 },
-      );
-
-      gsap.set(cameraRef.current, {
-        scale: 1.35,
-        y: 30,
-        transformOrigin: "center center",
-      });
-      gsap.set(p1Sara, { x: 960, y: 650 });
-      gsap.set(p1Cloud, { x: 960, y: 350, scale: 0.8 });
-      gsap.set(p1AppIcon, { scale: 0 });
-      gsap.set(p1Badge, { x: 960, y: 500, scale: 0.8 });
-      gsap.set(p2AppCard, { x: 960, y: 500, scale: 0.9 });
-      gsap.set(p2Sara, { x: 420, y: 500 });
-      gsap.set(p2Techs, { x: 1500, y: 500 });
-
-      // SVG lines fixed to card edges explicitly
-      gsap.set(p2LineLog, { strokeDasharray: 400, strokeDashoffset: 400 });
-      gsap.set(p2LineLive, { strokeDasharray: 400, strokeDashoffset: -400 });
-      gsap.set(p2LineWork, { strokeDasharray: 400, strokeDashoffset: 400 });
-      gsap.set(p2LineUpdate, { strokeDasharray: 400, strokeDashoffset: -400 });
-
-      gsap.set(p2BadgeLog, {
-        x: 620,
-        y: 420,
-        xPercent: -50,
-        yPercent: -50,
-        scale: 0.8,
-      });
-      gsap.set(p2BadgeLive, {
-        x: 620,
-        y: 580,
-        xPercent: -50,
-        yPercent: -50,
-        scale: 0.8,
-      });
-      gsap.set(p2BadgeWork, {
-        x: 1300,
-        y: 420,
-        xPercent: -50,
-        yPercent: -50,
-        scale: 0.8,
-      });
-      gsap.set(p2BadgeUpdate, {
-        x: 1300,
-        y: 580,
-        xPercent: -50,
-        yPercent: -50,
-        scale: 0.8,
-      });
-
-      // Fly icons updated to originate exactly from Node Centers
-      gsap.set(p2FlyLog, { x: 420, y: 480, scale: 0.5 });
-      gsap.set(p2FlyWork, { x: 1100, y: 480, scale: 0.5 });
-      gsap.set(p2FlyUpdate, { x: 1500, y: 520, scale: 0.5 });
-      gsap.set(p2FlyLive, { x: 820, y: 520, scale: 0.5 });
-
-      gsap.set(p3ProblemBox, { x: 420, y: 450, scale: 0.9 });
-      gsap.set(p3SolutionBox, { x: 1500, y: 450, scale: 0.9 });
-      gsap.set([p3RoadmapPathTop, p3RoadmapPathMid, p3RoadmapPathBot], {
-        strokeDasharray: 1200,
-        strokeDashoffset: 1200,
-      });
-      gsap.set(p3Target, { x: 1420, y: 450, scale: 0 });
-      gsap.set(p3TargetBadge, {
-        x: 960,
-        y: 425,
-        xPercent: -50,
-        yPercent: -50,
-        scale: 0.8,
-      });
-      gsap.set(p2LineLog, { strokeDasharray: 220, strokeDashoffset: 220 });
-      gsap.set(p2LineLive, { strokeDasharray: 220, strokeDashoffset: -220 });
-      gsap.set(p2LineWork, { strokeDasharray: 220, strokeDashoffset: 220 });
-      gsap.set(p2LineUpdate, { strokeDasharray: 220, strokeDashoffset: -220 });
-      // 1. Remove Phase 2 nodes from the staggered float array
-      const floatNodes = [p1SaraFloat, p3ProblemFloat, p3SolutionFloat];
-
-      floatNodes.forEach((ref, i) => {
-        idle.to(
-          ref,
-          {
-            y: "+=8",
-            duration: 3.5 + Math.abs(Math.sin(i)),
-            ease: "sine.inOut",
-            yoyo: true,
-            repeat: -1,
-            force3D: true,
-          },
-          0,
-        );
-      });
-
-      // 2. Float the ENTIRE Phase 2 wrapper as a single locked unit.
-      // This keeps the lines permanently attached to their exact targets!
-      idle.to(
-        p2Wrapper,
-        {
-          y: "+=8",
-          duration: 3.5,
-          ease: "sine.inOut",
-          yoyo: true,
-          repeat: -1,
-          force3D: true,
-        },
-        0,
-      );
-
-      const chaosDots = p1Chaos.children;
-      Array.from(chaosDots).forEach((dot, i) => {
-        const s1 = Math.sin(i * 12.5);
-        const s2 = Math.cos(i * 12.5);
-        idle.to(
-          dot,
-          {
-            x: s1 * 15,
-            y: s2 * 15,
-            rotation: s1 * 45,
-            duration: 0.4 + Math.abs(s2) * 0.3,
-            ease: "sine.inOut",
-            repeat: -1,
-            yoyo: true,
-            force3D: true,
-          },
-          0,
-        );
-      });
-
-      // PERFECT FADES
-      master.fromTo(
-        stageRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 1.5, ease: "power2.inOut" },
-        0,
-      );
-
-      master
-        .addLabel("p1", "+=0.2")
-        .to(p1Wrapper, { opacity: 1, duration: 0.1 }, "p1")
-        .to(p1Sara, { opacity: 1, duration: 1.2, ease: "power3.out" }, "p1")
-        .to(
-          p1Cloud,
-          { opacity: 1, scale: 1, duration: 1.5, ease: "power3.out" },
-          "p1+=0.4",
-        )
-        .addLabel("p1_idea", "+=1.5")
-        .to(
-          p1Chaos,
-          { opacity: 0, scale: 0.5, duration: 0.8, ease: "power2.inOut" },
-          "p1_idea",
-        )
-        .to(
-          p1AppIcon,
-          { opacity: 1, scale: 1, duration: 1, ease: "elastic.out(1, 0.6)" },
-          "p1_idea+=0.5",
-        )
-        .to(
-          p1Cloud,
-          {
-            filter: `drop-shadow(0 0 30px ${DS.colors.accent.cyan.glow})`,
-            duration: 1,
-          },
-          "p1_idea+=0.5",
-        )
-        // Note: The vertical line here was removed as requested
-        .addLabel("p1_connect", "+=0.5")
-        .to(
-          p1Badge,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p1_connect+=0.6",
-        )
-        .to(
-          cameraRef.current,
-          { scale: 1.4, duration: 3, ease: "power2.inOut" },
-          "p1_connect",
-        )
-        .to(
-          p1Caption,
-          { opacity: 1, y: -20, duration: 0.8, ease: "power2.out" },
-          "p1_connect+=1",
-        )
-        .addLabel("p1_exit", "+=2")
-        .to(
-          cameraRef.current,
-          { scale: 1.35, duration: 1.2, ease: "power2.inOut" },
-          "p1_exit",
-        )
-        .to(
-          [p1Wrapper, p1Caption],
-          { opacity: 0, duration: 1, ease: "power2.inOut" },
-          "p1_exit",
-        )
-        .addLabel("p2", "+=0.2")
-        .to(p2Wrapper, { opacity: 1, duration: 0.1 }, "p2")
-        .to(
-          p2AppCard,
-          { opacity: 1, scale: 1, duration: 1.2, ease: "power3.out" },
-          "p2",
-        )
-        .to(
-          [p2Sara, p2Techs],
-          { opacity: 1, duration: 1, ease: "power2.out", stagger: 0.2 },
-          "p2+=0.4",
-        )
-        .addLabel("p2_log", "+=0.5")
-        .to(
-          p2LineLog,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "p2_log",
-        )
-        .to(
-          p2BadgeLog,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p2_log+=0.4",
-        )
-        .to(p2FlyLog, { opacity: 1, scale: 1, duration: 0.2 }, "p2_log+=0.4")
-        .to(
-          p2FlyLog,
-          { x: 820, duration: 1, ease: "power2.inOut" },
-          "p2_log+=0.6",
-        )
-        .to(p2FlyLog, { opacity: 0, scale: 0, duration: 0.3 }, "p2_log+=1.5")
-        .addLabel("p2_assign", "+=0.2")
-        .to(
-          p2LineWork,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "p2_assign",
-        )
-        .to(
-          p2BadgeWork,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p2_assign+=0.4",
-        )
-        .to(
-          p2FlyWork,
-          { opacity: 1, scale: 1, duration: 0.2 },
-          "p2_assign+=0.4",
-        )
-        .to(
-          p2FlyWork,
-          { x: 1500, duration: 1, ease: "power2.inOut" },
-          "p2_assign+=0.6",
-        )
-        .to(
-          p2FlyWork,
-          { opacity: 0, scale: 0, duration: 0.3 },
-          "p2_assign+=1.5",
-        )
-        .addLabel("p2_update", "+=0.6")
-        .to(
-          p2LineUpdate,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "p2_update",
-        )
-        .to(
-          p2BadgeUpdate,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p2_update+=0.4",
-        )
-        .to(
-          p2FlyUpdate,
-          { opacity: 1, scale: 1, duration: 0.2 },
-          "p2_update+=0.4",
-        )
-        .to(
-          p2FlyUpdate,
-          { x: 1100, duration: 1, ease: "power2.inOut" },
-          "p2_update+=0.6",
-        )
-        .to(
-          p2FlyUpdate,
-          { opacity: 0, scale: 0, duration: 0.3 },
-          "p2_update+=1.5",
-        )
-        .addLabel("p2_status_change", "+=0")
-        .to(
-          p2AppStatusInProg,
-          { opacity: 0, duration: 0.3 },
-          "p2_status_change",
-        )
-        .to(
-          p2AppStatusDone,
-          { opacity: 1, duration: 0.5, ease: "power2.out" },
-          "p2_status_change+=0.2",
-        )
-        .to(
-          p2AppCard,
-          {
-            boxShadow: `0 0 50px ${DS.colors.accent.green.glow}`,
-            duration: 0.8,
-          },
-          "p2_status_change+=0.2",
-        )
-        .addLabel("p2_live", "+=0.5")
-        .to(
-          p2LineLive,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 1,
-            ease: "power2.inOut",
-          },
-          "p2_live",
-        )
-        .to(
-          p2BadgeLive,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p2_live+=0.4",
-        )
-        .to(p2FlyLive, { opacity: 1, scale: 1, duration: 0.2 }, "p2_live+=0.4")
-        .to(
-          p2FlyLive,
-          { x: 420, duration: 1, ease: "power2.inOut" },
-          "p2_live+=0.6",
-        )
-        .to(p2FlyLive, { opacity: 0, scale: 0, duration: 0.3 }, "p2_live+=1.5")
-        .addLabel("p2_hold", "+=0.5")
-        .to(
-          p2Caption,
-          { opacity: 1, y: -20, duration: 0.8, ease: "power2.out" },
-          "p2_hold",
-        )
-        .to(
-          cameraRef.current,
-          { scale: 1.3, duration: 3, ease: "power2.inOut" },
-          "p2_hold",
-        )
-        .addLabel("p2_exit", "+=1.5")
-        .to(
-          cameraRef.current,
-          { scale: 1.35, duration: 1.2, ease: "power2.inOut" },
-          "p2_exit",
-        )
-        .to(
-          [p2Wrapper, p2Caption],
-          { opacity: 0, duration: 1, ease: "power2.inOut" },
-          "p2_exit",
-        )
-        .addLabel("p3", "+=0.2")
-        .to(p3Wrapper, { opacity: 1, duration: 0.1 }, "p3")
-        .to(
-          [p3ProblemBox, p3SolutionBox],
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 1.2,
-            ease: "power3.out",
-            stagger: 0.2,
-          },
-          "p3",
-        )
-        .addLabel("p3_paths", "+=0.8")
-        .to(
-          p3RoadmapPathTop,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 2.2,
-            ease: "power2.inOut",
-          },
-          "p3_paths",
-        )
-        .to(
-          p3RoadmapPathMid,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 2.2,
-            ease: "power2.inOut",
-          },
-          "p3_paths+=0.2",
-        )
-        .to(
-          p3RoadmapPathBot,
-          {
-            opacity: 1,
-            strokeDashoffset: 0,
-            duration: 2.2,
-            ease: "power2.inOut",
-          },
-          "p3_paths+=0.4",
-        )
-        .addLabel("p3_target", "+=1.8")
-        .to(
-          p3Target,
-          { opacity: 1, scale: 1, duration: 0.8, ease: "elastic.out(1, 0.5)" },
-          "p3_target",
-        )
-        .to(
-          p3TargetBadge,
-          { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" },
-          "p3_target+=0.4",
-        )
-        .addLabel("p3_cap", "+=0.5")
-        .to(
-          p3Caption,
-          { opacity: 1, y: -20, duration: 1, ease: "power2.out" },
-          "p3_cap",
-        )
-        .to(
-          cameraRef.current,
-          { scale: 1.3, duration: 4, ease: "power2.inOut" },
-          "p3_cap",
-        )
-        .to({}, { duration: 2 }) // Hold before fade
-        .addLabel("exit")
-        .to(
-          stageRef.current,
-          { opacity: 0, duration: 1.5, ease: "power2.inOut" },
-          "exit",
-        ); // SMOOTH EXIT FADE
-
-      masterTl.current = master;
-      idleTl.current = idle;
-    }, stageRef);
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    const time = frame / fps;
-    if (masterTl.current) masterTl.current.seek(time);
-    if (idleTl.current) idleTl.current.seek(time);
-  }, [frame, fps]);
-
-  return (
-    <div
-      ref={stageRef}
-      style={{
-        position: "absolute",
-        width: 1920,
-        height: 1080,
-        overflow: "hidden",
-        opacity: 0,
-      }}
-    >
-      <div
-        ref={cameraRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "absolute",
-          transformOrigin: "center center",
-        }}
-      >
-        <svg style={{ position: "absolute", width: 0, height: 0 }}>
-          <defs>
-            <marker
-              id="arrowCyanR"
-              markerWidth="8"
-              markerHeight="6"
-              refX="7"
-              refY="3"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 8 3, 0 6"
-                fill={DS.colors.accent.cyan.base}
-              />
-            </marker>
-            <marker
-              id="arrowGreenL"
-              markerWidth="8"
-              markerHeight="6"
-              refX="1"
-              refY="3"
-              orient="auto-start-reverse"
-            >
-              <polygon
-                points="8 0, 0 3, 8 6"
-                fill={DS.colors.accent.green.base}
-              />
-            </marker>
-            <marker
-              id="arrowIndigoR"
-              markerWidth="8"
-              markerHeight="6"
-              refX="7"
-              refY="3"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 8 3, 0 6"
-                fill={DS.colors.accent.indigo.base}
-              />
-            </marker>
-          </defs>
-        </svg>
-
-        {/* Phase 1 */}
-        <div
-          ref={(el) => (refs.current.p1Wrapper = el)}
-          style={{ position: "absolute", inset: 0 }}
-        >
-          <div
-            ref={(el) => (refs.current.p1Badge = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              zIndex: 10,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.cyan}>Need A Better System</Badge>
-          </div>
-          <div
-            ref={(el) => (refs.current.p1Sara = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p1SaraFloat = el)}
-              style={{ willChange: "transform" }}
-            >
-              <FlowNode
-                title="Sara"
-                icon={<PersonIcon />}
-                glowColor={DS.colors.accent.cyan}
-              />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p1Cloud = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 320,
-              height: 200,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                width: "100%",
-                height: "100%",
-                color: DS.colors.panel,
-              }}
-            >
-              <CloudIcon />
-            </div>
-            <div
-              ref={(el) => (refs.current.p1Chaos = el)}
-              style={{
-                position: "absolute",
-                width: 140,
-                height: 80,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 6,
-                justifyContent: "center",
-                alignContent: "center",
-              }}
-            >
-              {Array.from({ length: 15 }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 20,
-                    height: 20,
-                    background:
-                      i % 4 === 0 ? DS.colors.accent.rose.base : "#FEF3C7",
-                    borderRadius: 4,
-                    border: `1px solid ${DS.colors.borderBright}`,
-                  }}
-                />
-              ))}
-            </div>
-            <div
-              ref={(el) => (refs.current.p1AppIcon = el)}
-              style={{
-                position: "absolute",
-                width: 80,
-                height: 80,
-                background: DS.colors.cardElevated,
-                borderRadius: 20,
-                border: `2px solid ${DS.colors.accent.green.base}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: DS.colors.accent.green.base,
-                boxShadow: `0 0 30px ${DS.colors.accent.green.glow}`,
-              }}
-            >
-              <div style={{ width: 40, height: 40 }}>
-                <LaptopIcon />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Phase 2 */}
-        <div
-          ref={(el) => (refs.current.p2Wrapper = el)}
-          style={{ position: "absolute", inset: 0 }}
-        >
-          <div
-            ref={(el) => (refs.current.p2BadgeLog = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              zIndex: 10,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.cyan}>Log Repair</Badge>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2BadgeLive = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              zIndex: 10,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.green}>Live Visibility</Badge>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2BadgeWork = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              zIndex: 10,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.indigo}>Assigned Work</Badge>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2BadgeUpdate = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              zIndex: 10,
-            }}
-          >
-            <Badge colorObj={DS.colors.accent.green}>Real-Time Updates</Badge>
-          </div>
-
-          <div
-            ref={(el) => (refs.current.p2AppCard = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p2AppFloat = el)}
-              style={{
-                willChange: "transform",
-                width: 280,
-                height: 420,
-                background: DS.colors.panel,
-                borderRadius: 32,
-                border: `2px solid ${DS.colors.accent.cyan.base}`,
-                display: "flex",
-                flexDirection: "column",
-                padding: 24,
-                gap: 24,
-                boxShadow: `0 0 50px ${DS.colors.accent.cyan.glow}`,
-              }}
-            >
-              <div
-                style={{
-                  width: "100%",
-                  textAlign: "center",
-                  ...DS.font.label,
-                  color: DS.colors.accent.cyan.base,
-                  letterSpacing: "0.1em",
-                }}
-              >
-                REPAIR APP
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  background: DS.colors.bg,
-                  borderRadius: 16,
-                  border: `1px solid ${DS.colors.border}`,
-                  padding: 20,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                }}
-              >
-                <div
-                  style={{
-                    width: "90%",
-                    height: 16,
-                    background: DS.colors.borderBright,
-                    borderRadius: 8,
-                  }}
-                />
-                <div
-                  style={{
-                    width: "60%",
-                    height: 16,
-                    background: DS.colors.borderBright,
-                    borderRadius: 8,
-                  }}
-                />
-                <div style={{ marginTop: "auto" }}>
-                  <div style={{ position: "relative", height: 40 }}>
-                    <div
-                      ref={(el) => (refs.current.p2AppStatusInProg = el)}
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: "50%",
-                          background: DS.colors.accent.amber.base,
-                        }}
-                      />
-                      <div
-                        style={{
-                          fontSize: 14,
-                          color: DS.colors.textSecondary,
-                        }}
-                      >
-                        In Progress
-                      </div>
-                    </div>
-                    <div
-                      ref={(el) => (refs.current.p2AppStatusDone = el)}
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: DS.colors.accent.green.base,
-                        borderRadius: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: DS.colors.bg,
-                        fontWeight: 700,
-                        fontSize: 14,
-                      }}
-                    >
-                      Completed
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2Sara = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p2SaraFloat = el)}
-              style={{ willChange: "transform" }}
-            >
-              <FlowNode
-                title="Sara"
-                icon={<PersonIcon />}
-                glowColor={DS.colors.accent.cyan}
-                style={{ minWidth: 160 }}
-              />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2Techs = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p2TechsFloat = el)}
-              style={{ willChange: "transform" }}
-            >
-              <FlowNode
-                title="Technicians"
-                icon={<PersonIcon />}
-                glowColor={DS.colors.accent.indigo}
-                style={{ minWidth: 160 }}
-              />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2FlyLog = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 44,
-              height: 44,
-              background: DS.colors.card,
-              borderRadius: 10,
-              border: `2px solid ${DS.colors.accent.cyan.base}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.accent.cyan.base,
-              zIndex: 20,
-              boxShadow: `0 0 20px ${DS.colors.accent.cyan.glow}`,
-            }}
-          >
-            <div style={{ width: 22, height: 22 }}>
-              <LaptopIcon />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2FlyWork = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 44,
-              height: 44,
-              background: DS.colors.card,
-              borderRadius: 10,
-              border: `2px solid ${DS.colors.accent.indigo.base}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.accent.indigo.base,
-              zIndex: 20,
-              boxShadow: `0 0 20px ${DS.colors.accent.indigo.glow}`,
-            }}
-          >
-            <div style={{ width: 22, height: 22 }}>
-              <LaptopIcon />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2FlyUpdate = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 36,
-              height: 36,
-              background: DS.colors.accent.green.base,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.bg,
-              zIndex: 20,
-              boxShadow: `0 0 20px ${DS.colors.accent.green.glow}`,
-            }}
-          >
-            <div style={{ width: 18, height: 18 }}>
-              <CheckIcon />
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p2FlyLive = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 36,
-              height: 36,
-              background: DS.colors.accent.green.base,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: DS.colors.bg,
-              zIndex: 20,
-              boxShadow: `0 0 20px ${DS.colors.accent.green.glow}`,
-            }}
-          >
-            <div style={{ width: 18, height: 18 }}>
-              <CheckIcon />
-            </div>
-          </div>
-        </div>
-
-        {/* Phase 3 */}
-        <div
-          ref={(el) => (refs.current.p3Wrapper = el)}
-          style={{ position: "absolute", inset: 0 }}
-        >
-          <svg
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: 1920,
-              height: 1080,
-              pointerEvents: "none",
-            }}
-          >
-            <path
-              ref={(el) => (refs.current.p3RoadmapPathTop = el)}
-              d="M 500 450 Q 960 150 1420 450"
-              stroke={DS.colors.accent.indigo.base}
-              strokeWidth="6"
-              fill="none"
-              strokeLinecap="round"
-              opacity="0"
-            />
-            <path
-              ref={(el) => (refs.current.p3RoadmapPathMid = el)}
-              d="M 500 450 L 1420 450"
-              stroke={DS.colors.accent.green.base}
-              strokeWidth="6"
-              fill="none"
-              strokeLinecap="round"
-              opacity="0"
-            />
-            <path
-              ref={(el) => (refs.current.p3RoadmapPathBot = el)}
-              d="M 500 450 Q 960 750 1420 450"
-              stroke={DS.colors.accent.amber.base}
-              strokeWidth="6"
-              fill="none"
-              strokeLinecap="round"
-              opacity="0"
-            />
-          </svg>
-          <div
-            ref={(el) => (refs.current.p3ProblemBox = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p3ProblemFloat = el)}
-              style={{
-                willChange: "transform",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 24,
-              }}
-            >
-              <div
-                style={{
-                  width: 160,
-                  height: 160,
-                  background: DS.colors.cardElevated,
-                  borderRadius: 32,
-                  border: `2px solid ${DS.colors.borderBright}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fill: DS.colors.textSecondary,
-                }}
-              >
-                <div style={{ width: 80, height: 80, opacity: 0.7 }}>
-                  <ShopIcon />
-                </div>
-              </div>
-              <Badge
-                colorObj={{
-                  base: DS.colors.textSecondary,
-                  glow: "transparent",
-                }}
-                style={{
-                  letterSpacing: "0.1em",
-                  border: `1px solid ${DS.colors.textTertiary}`,
-                }}
-              >
-                CURRENT PROBLEM
-              </Badge>
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p3SolutionBox = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <div
-              ref={(el) => (refs.current.p3SolutionFloat = el)}
-              style={{
-                willChange: "transform",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 24,
-              }}
-            >
-              <div
-                style={{
-                  width: 160,
-                  height: 160,
-                  background: DS.colors.cardElevated,
-                  borderRadius: 32,
-                  border: `2px solid ${DS.colors.accent.cyan.base}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: DS.colors.accent.cyan.base,
-                  boxShadow: `0 0 60px ${DS.colors.accent.cyan.glow}`,
-                }}
-              >
-                <div style={{ width: 72, height: 72 }}>
-                  <LaptopIcon />
-                </div>
-              </div>
-              <Badge
-                colorObj={DS.colors.accent.cyan}
-                style={{ letterSpacing: "0.1em" }}
-              >
-                IDEAL SOLUTION
-              </Badge>
-            </div>
-          </div>
-          <div
-            ref={(el) => (refs.current.p3Target = el)}
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 64,
-              height: 64,
-              color: DS.colors.textPrimary,
-            }}
-          >
-            <TargetIcon />
-          </div>
-          <div
-            ref={(el) => (refs.current.p3TargetBadge = el)}
-            style={{ position: "absolute", transform: "translate(-50%, -50%)" }}
-          >
-            <Badge
-              colorObj={DS.colors.accent.green}
-              style={{ background: DS.colors.panel }}
-            >
-              BEST FIT
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      <div
-        ref={(el) => (refs.current.p1Caption = el)}
-        style={{
-          position: "absolute",
-          bottom: 80,
-          width: "100%",
-          textAlign: "center",
-          ...DS.font.h1,
-          fontSize: 64,
-          color: DS.colors.textPrimary,
-        }}
-      >
-        Time for change.
-      </div>
-      <div
-        ref={(el) => (refs.current.p2Caption = el)}
-        style={{
-          position: "absolute",
-          bottom: 80,
-          width: "100%",
-          textAlign: "center",
-          ...DS.font.h1,
-          fontSize: 64,
-          color: DS.colors.accent.cyan.bright,
-        }}
-      >
-        One source of truth.
-      </div>
-      <div
-        ref={(el) => (refs.current.p3Caption = el)}
-        style={{
-          position: "absolute",
-          bottom: 80,
-          width: "100%",
-          textAlign: "center",
-          ...DS.font.display,
-          fontSize: 64,
-          color: DS.colors.textPrimary,
-        }}
-      >
-        Lets choose the right path.
-      </div>
-    </div>
-  );
-};
-
-// ── 5. MAIN ORCHESTRATOR ────────────────────────────────────
-const MainScene = () => {
-  const { width } = useVideoConfig();
-  const scale = width / 1920;
-
-  // Accurately matched with GSAP timelines to guarantee completion
-  const dur = {
-    welcome: 780, // 13s
-    scene1: 900, // 15s
-    scene2: 1800, // 20s
-    scene3: 1800, // 30s (Extended to prevent cuts)
-    scene4: 720, // 12s
-    scene5: 720, // 12s
-    scene6: 3000, // 35s (Extended to prevent cuts)
-  };
-
-  const start1 = dur.welcome;
-  const start2 = start1 + dur.scene1;
-  const start3 = start2 + dur.scene2;
-  const start4 = start3 + dur.scene3;
-  const start5 = start4 + dur.scene4;
-  const start6 = start5 + dur.scene5;
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: DS.colors.bg, overflow: "hidden" }}>
-      <GlobalStyles />
       <div
         style={{
           width: 1920,
           height: 1080,
+          position: "relative",
           transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          position: "absolute",
+          overflow: "hidden",
         }}
       >
-        <Sequence from={0} durationInFrames={dur.welcome}>
-          <WelcomeScreen />
-        </Sequence>
-        <Sequence from={start1} durationInFrames={dur.scene1}>
-          <Scene1_EveryProjectStartsWithAProblem />
-        </Sequence>
-        <Sequence from={start2} durationInFrames={dur.scene2}>
-          <Scene2_MeetSaraAndHerRepairShop />
-        </Sequence>
-        <Sequence from={start3} durationInFrames={dur.scene3}>
-          <Scene3_TheWorkflowWorksSmoothly />
-        </Sequence>
-        <Sequence from={start4} durationInFrames={dur.scene4}>
-          <Scene4_SuccessCreatesPressure />
-        </Sequence>
-        <Sequence from={start5} durationInFrames={dur.scene5}>
-          <Scene5_TheStickyNoteSystemBreaksDown />
-        </Sequence>
-        <Sequence from={start6} durationInFrames={dur.scene6}>
-          <Scene6_TheTransformationAndConclusion />
-        </Sequence>
+        {children}
       </div>
     </AbsoluteFill>
   );
 };
 
-export default MainScene;
+// ─── ENHANCED ICONS FOR VISUALIZATION ─────────────────────────────────────
+const IconWebUI = ({ color }) => (
+  <svg
+    width="72"
+    height="72"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="4" y="12" width="56" height="40" rx="4" />
+    <path d="M4 22h56" />
+    <circle cx="12" cy="17" r="1.5" fill={color} />
+    <circle cx="18" cy="17" r="1.5" fill={color} />
+    <rect
+      x="10"
+      y="28"
+      width="16"
+      height="16"
+      rx="2"
+      fill={color}
+      fillOpacity="0.2"
+      stroke="none"
+    />
+    <rect x="32" y="28" width="22" height="4" rx="2" />
+    <rect x="32" y="36" width="14" height="4" rx="2" />
+    <rect x="32" y="44" width="18" height="4" rx="2" />
+  </svg>
+);
+
+const IconMobileUI = ({ color }) => (
+  <svg
+    width="72"
+    height="72"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="18" y="6" width="28" height="52" rx="6" />
+    <path d="M28 12h8" />
+    <circle
+      cx="32"
+      cy="24"
+      r="6"
+      fill={color}
+      fillOpacity="0.2"
+      stroke="none"
+    />
+    <rect x="24" y="36" width="16" height="3" rx="1.5" />
+    <rect x="24" y="42" width="12" height="3" rx="1.5" />
+    <rect x="26" y="52" width="12" height="2" rx="1" fill={color} />
+  </svg>
+);
+
+const IconUnifiedUI = ({ color }) => (
+  <svg
+    width="80"
+    height="80"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Web Frame */}
+    <rect x="4" y="14" width="40" height="30" rx="3" />
+    <path d="M4 22h40" />
+    <rect
+      x="10"
+      y="28"
+      width="12"
+      height="10"
+      rx="2"
+      fill={color}
+      fillOpacity="0.2"
+      stroke="none"
+    />
+    <rect x="26" y="28" width="14" height="3" rx="1.5" />
+    <rect x="26" y="34" width="10" height="3" rx="1.5" />
+    {/* Mobile Frame Overlap */}
+    <rect
+      x="36"
+      y="24"
+      width="22"
+      height="34"
+      rx="4"
+      fill={DS.colors.card}
+      strokeWidth="2"
+    />
+    <circle
+      cx="47"
+      cy="34"
+      r="4"
+      fill={color}
+      fillOpacity="0.2"
+      stroke="none"
+    />
+    <rect x="42" y="42" width="10" height="2" rx="1" />
+    <rect x="42" y="47" width="7" height="2" rx="1" />
+  </svg>
+);
+
+const IconLogicFlow = ({ color }) => (
+  <svg
+    width="72"
+    height="72"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="8" y="24" width="16" height="16" rx="4" />
+    <rect x="40" y="10" width="16" height="16" rx="4" />
+    <rect x="40" y="38" width="16" height="16" rx="4" />
+    <path d="M24 32h8v-14h8" />
+    <path d="M24 32h8v14h8" />
+    <circle cx="32" cy="32" r="3" fill={color} stroke="none" />
+  </svg>
+);
+
+const IconDBStack = ({ color }) => (
+  <svg
+    width="72"
+    height="72"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <ellipse cx="32" cy="18" rx="16" ry="6" />
+    <path d="M48 18v14c0 3.3-7.2 6-16 6s-16-2.7-16-6V18" />
+    <path d="M48 32v14c0 3.3-7.2 6-16 6s-16-2.7-16-6V32" />
+    <line
+      x1="32"
+      y1="24"
+      x2="32"
+      y2="24.1"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <line
+      x1="32"
+      y1="38"
+      x2="32"
+      y2="38.1"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const Box = ({ icon, label, color, glow }) => (
+  <div
+    style={{
+      width: 200,
+      height: 200,
+      background: DS.colors.card,
+      border: `2px solid ${color}`,
+      borderRadius: 32,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      boxShadow: glow
+        ? `0 0 32px ${glow}, 0 12px 32px rgba(0,0,0,0.5)`
+        : `0 12px 32px rgba(0,0,0,0.5)`,
+      zIndex: 10,
+    }}
+  >
+    {icon}
+    <div
+      style={{
+        marginTop: 24,
+        fontSize: 18,
+        fontWeight: 700,
+        color: DS.colors.textPrimary,
+        letterSpacing: "0.02em",
+      }}
+    >
+      {label}
+    </div>
+  </div>
+);
+
+// ─── UPDATED BADGELIST (With Inline Flicker Prevention) ───────────────────
+const BadgeList = ({ forwardRef, items }) => (
+  <div
+    ref={forwardRef}
+    style={{ display: "flex", flexDirection: "column", gap: 24 }}
+  >
+    {items.map((item, i) => (
+      <div
+        key={i}
+        style={{
+          opacity: 0, // Prevent Flicker
+          transform: "translateX(-40px)", // Prevent Flicker
+          padding: "18px 32px",
+          background: DS.colors.card,
+          borderLeft: `6px solid ${item.color}`,
+          fontSize: 24,
+          fontWeight: 600,
+          color: DS.colors.textPrimary,
+          borderRadius: "0 16px 16px 0",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {item.label}
+      </div>
+    ))}
+  </div>
+);
+// ─── SCENE 1: WELCOME BACK ────────────────────────────────────────────────
+const Scene1_WelcomeBack = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+  const text1Ref = useRef(null),
+    text2Ref = useRef(null);
+  const containerRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      // Safe GSAP Initialization (Replaces inline CSS transforms)
+      master.set([text1Ref.current, text2Ref.current], {
+        opacity: 0,
+        y: 40,
+        scale: 0.95,
+      });
+      master.set(containerRef.current, { scale: 1 });
+
+      master
+        // Cinematic ambient zoom on the entire container
+
+        // Sequence in elements
+        .to(
+          text1Ref.current,
+          { opacity: 1, y: 0, scale: 1, duration: 1.5, ease: DS.easing.enter },
+          0.5,
+        )
+        .to(
+          text2Ref.current,
+          { opacity: 1, y: 0, scale: 1, duration: 1.5, ease: DS.easing.enter },
+          1.5,
+        )
+
+        // Clean outro
+        .addLabel("outro", 4.5)
+        .to(
+          [text1Ref.current, text2Ref.current],
+          {
+            opacity: 0,
+            y: -40,
+            duration: 1.5,
+            ease: DS.easing.exit,
+            stagger: 0.2,
+          },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <h1
+          ref={text1Ref}
+          style={{
+            fontSize: 96,
+            fontWeight: 900,
+            color: DS.colors.textPrimary,
+            margin: 0,
+            letterSpacing: "-0.02em",
+            textShadow: `0 12px 48px rgba(0,0,0,0.6)`, // Added depth
+          }}
+        >
+          Welcome back!
+        </h1>
+        <h2
+          ref={text2Ref}
+          style={{
+            fontSize: 44,
+            fontWeight: 400,
+            color: DS.colors.textSecondary,
+            margin: "32px 0 0 0",
+          }}
+        >
+          Let’s look at the different ways we have to build an app.
+        </h2>
+      </div>
+    </ScaledStage>
+  );
+};
+
+// ─── SCENE 2: ON A HIGH LEVEL ─────────────────────────────────────────────
+const Scene2_HighLevel = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+  const badgeRef = useRef(null),
+    textRef = useRef(null),
+    glowRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      // Safe GSAP Initialization
+      master.set(badgeRef.current, { opacity: 0, scale: 0.8, y: 30 });
+      master.set(textRef.current, { opacity: 0, scale: 0.95, y: 30 });
+      master.set(glowRef.current, { opacity: 0, scale: 0.5 });
+
+      master
+        // Reveal a subtle ambient backlight for the badge
+        .to(
+          glowRef.current,
+          { opacity: 0.4, scale: 1, duration: 2, ease: DS.easing.smooth },
+          0.2,
+        )
+
+        // Snap elements in
+        .to(
+          badgeRef.current,
+          { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: DS.easing.spring },
+          0.5,
+        )
+        .to(
+          textRef.current,
+          { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: DS.easing.enter },
+          1.2,
+        )
+
+        // Clean outro
+        .addLabel("outro", 4)
+        .to(
+          [badgeRef.current, textRef.current, glowRef.current],
+          {
+            opacity: 0,
+            y: -30,
+            scale: 0.95,
+            duration: 1,
+            ease: DS.easing.exit,
+            stagger: 0.1,
+          },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* Cinematic ambient backlight behind badge */}
+        <div
+          ref={glowRef}
+          style={{
+            position: "absolute",
+            width: 400,
+            opacity: 0,
+            height: 160,
+            background: DS.colors.cyan,
+            filter: "blur(80px)",
+            transform: "translateY(-40px) scale(0.5)",
+            zIndex: 0,
+            borderRadius: "50%",
+          }}
+        />
+
+        <div
+          ref={badgeRef}
+          style={{
+            zIndex: 10,
+            padding: "16px 40px",
+            background: DS.colors.panel,
+            border: `2px solid ${DS.colors.cyan}`,
+            borderRadius: 9999,
+            color: DS.colors.cyan,
+            fontSize: 24,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            opacity: 0, // <-- ADD THIS
+            transform: "scale(0.8) translateY(30px)", // <-- ADD THIS
+            letterSpacing: "0.1em",
+            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 32px ${DS.colors.cyanGlow}, inset 0 0 16px ${DS.colors.cyanGlow}`,
+          }}
+        >
+          On a high level
+        </div>
+
+        <h3
+          ref={textRef}
+          style={{
+            zIndex: 10,
+            fontSize: 56,
+            fontWeight: 700,
+            color: DS.colors.textPrimary,
+            margin: "40px 0 0 0",
+            textShadow: `0 12px 48px rgba(0,0,0,0.6)`,
+            opacity: 0, // <-- ADD THIS
+            transform: "scale(0.95) translateY(30px)", // <-- ADD THIS
+          }}
+        >
+          There are three main ways
+        </h3>
+      </div>
+    </ScaledStage>
+  );
+};
+
+// ─── SCENE 3: TRADITIONAL ─────────────────────────────────────────────────
+const Scene3_Traditional = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+
+  const titleRef = useRef(null);
+  const staticLinesAppLogicRef = useRef(null),
+    flowLinesAppLogicRef = useRef(null);
+  const staticLinesLogicDBRef = useRef(null),
+    flowLinesLogicDBRef = useRef(null);
+  const badges1Ref = useRef(null),
+    badges2Ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      master
+        // 1. Bring in the title
+        .to(
+          titleRef.current,
+          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
+          0.5,
+        )
+
+        // 2. Show Frontend Apps (Web & Mobile)
+        .to(
+          [".node-web", ".node-mobile"],
+          {
+            opacity: 1,
+            scale: 1,
+            duration: 1.2,
+            stagger: 0.2,
+            ease: DS.easing.spring,
+          },
+          1.5,
+        )
+
+        // 3. Draw lines to Logic, then pop Logic in
+        .to(
+          staticLinesAppLogicRef.current,
+          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
+          2.5,
+        )
+        .to(
+          ".node-logic",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          3.0,
+        )
+        .to(flowLinesAppLogicRef.current, { opacity: 1, duration: 0.5 }, 3.5)
+        .to(
+          flowLinesAppLogicRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          3.5,
+        )
+
+        // 4. Draw lines to Database, then pop Database in
+        .to(
+          staticLinesLogicDBRef.current,
+          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
+          4.5,
+        )
+        .to(
+          ".node-db",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          5.0,
+        )
+        .to(flowLinesLogicDBRef.current, { opacity: 1, duration: 0.5 }, 5.5)
+        .to(
+          flowLinesLogicDBRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          5.5,
+        )
+
+        // 5. Fly in the left-side badges sequentially
+        .to(
+          badges1Ref.current.children,
+          {
+            opacity: 1,
+            x: 0,
+            duration: 1.0,
+            stagger: 0.2,
+            ease: DS.easing.enter,
+          },
+          7.0,
+        )
+        .to(
+          badges2Ref.current.children,
+          {
+            opacity: 1,
+            x: 0,
+            duration: 1.0,
+            stagger: 0.2,
+            ease: DS.easing.enter,
+          },
+          8.5,
+        )
+
+        // 6. Clean Outro
+        .addLabel("outro", 18)
+        .to(
+          masterRef.current.getChildren(),
+          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      {/* ─── TITLE ─── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 100,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <div
+          ref={titleRef}
+          style={{ opacity: 0, transform: "translateY(-20px)" }}
+        >
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 900,
+              color: DS.colors.textPrimary,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            1. Traditional Approach
+          </div>
+          <div
+            style={{
+              width: 120,
+              height: 6,
+              background: DS.colors.cyan,
+              marginTop: 24,
+              borderRadius: 3,
+              margin: "24px auto 0 auto",
+            }}
+          ></div>
+        </div>
+      </div>
+
+      {/* ─── LINES: APP -> LOGIC ─── */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 0,
+        }}
+      >
+        <g
+          ref={staticLinesAppLogicRef}
+          stroke={DS.colors.border}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="500"
+          strokeDashoffset="500"
+        >
+          <path d="M 760 360 L 1000 520" /> {/* Web to Logic */}
+          <path d="M 760 680 L 1000 520" /> {/* Mobile to Logic */}
+        </g>
+      </svg>
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 1,
+        }}
+      >
+        <g
+          ref={flowLinesAppLogicRef}
+          stroke={DS.colors.cyan}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="16 32"
+          opacity="0"
+          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.cyanGlow})` }}
+        >
+          <path d="M 760 360 L 1000 520" />
+          <path d="M 760 680 L 1000 520" />
+        </g>
+      </svg>
+
+      {/* ─── LINES: LOGIC -> DB ─── */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 0,
+        }}
+      >
+        <g
+          ref={staticLinesLogicDBRef}
+          stroke={DS.colors.border}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="500"
+          strokeDashoffset="500"
+        >
+          <path d="M 1200 520 L 1440 520" /> {/* Logic to DB */}
+        </g>
+      </svg>
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 1,
+        }}
+      >
+        <g
+          ref={flowLinesLogicDBRef}
+          stroke={DS.colors.cyan}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="16 32"
+          opacity="0"
+          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.cyanGlow})` }}
+        >
+          <path d="M 1200 520 L 1440 520" />
+        </g>
+      </svg>
+
+      {/* ─── NODES (Structure separates positioning from GSAP scaling) ─── */}
+      <div
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: "100%",
+          zIndex: 10,
+        }}
+      >
+        {/* Frontend Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 360,
+            left: 660,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div
+            className="node-web"
+            style={{ opacity: 0, transform: "scale(0.8)" }}
+          >
+            <Box
+              icon={<IconWebUI color={DS.colors.cyan} />}
+              label="Web App"
+              color={DS.colors.cyan}
+              glow={DS.colors.cyanGlow}
+            />
+          </div>
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            top: 680,
+            left: 660,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div
+            className="node-mobile"
+            style={{ opacity: 0, transform: "scale(0.8)" }}
+          >
+            <Box
+              icon={<IconMobileUI color={DS.colors.cyan} />}
+              label="Mobile App"
+              color={DS.colors.cyan}
+              glow={DS.colors.cyanGlow}
+            />
+          </div>
+        </div>
+
+        {/* Logic Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 520,
+            left: 1100,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div
+            className="node-logic"
+            style={{ opacity: 0, transform: "scale(0.8)" }}
+          >
+            <Box
+              icon={<IconLogicFlow color={DS.colors.textSecondary} />}
+              label="Logic"
+              color={DS.colors.border}
+            />
+          </div>
+        </div>
+
+        {/* Database Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 520,
+            left: 1540,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div
+            className="node-db"
+            style={{ opacity: 0, transform: "scale(0.8)" }}
+          >
+            <Box
+              icon={<IconDBStack color={DS.colors.textSecondary} />}
+              label="Database"
+              color={DS.colors.border}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ─── BADGES ─── */}
+      <div style={{ position: "absolute", top: 320, left: 100 }}>
+        <BadgeList
+          forwardRef={badges1Ref}
+          items={[
+            { label: "High Flexibility", color: DS.colors.green },
+            { label: "Strong Performance", color: DS.colors.green },
+          ]}
+        />
+      </div>
+
+      <div style={{ position: "absolute", top: 580, left: 100 }}>
+        <BadgeList
+          forwardRef={badges2Ref}
+          items={[
+            { label: "Heavy Coding", color: DS.colors.amber },
+            { label: "More Configuration", color: DS.colors.amber },
+            { label: "High Maintenance", color: DS.colors.amber },
+          ]}
+        />
+      </div>
+    </ScaledStage>
+  );
+};
+// ─── SCENE 4: CROSS PLATFORM ──────────────────────────────────────────────
+const Scene4_CrossPlatform = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+
+  const titleRef = useRef(null);
+  const staticLinesAppLogicRef = useRef(null),
+    flowLinesAppLogicRef = useRef(null);
+  const staticLinesLogicDBRef = useRef(null),
+    flowLinesLogicDBRef = useRef(null);
+  const badges1Ref = useRef(null),
+    badges2Ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      // 1. Safe Initialization using GSAP (No inline transforms on animated elements)
+      master.set(titleRef.current, { opacity: 0, y: -20 });
+      master.set(".node-unified, .node-logic, .node-db", {
+        opacity: 0,
+        scale: 0.8,
+      });
+
+      master.set(staticLinesAppLogicRef.current, {
+        strokeDasharray: 500,
+        strokeDashoffset: 500,
+      });
+      master.set(flowLinesAppLogicRef.current, { opacity: 0 });
+
+      master.set(staticLinesLogicDBRef.current, {
+        strokeDasharray: 500,
+        strokeDashoffset: 500,
+      });
+      master.set(flowLinesLogicDBRef.current, { opacity: 0 });
+
+      master.set([badges1Ref.current.children, badges2Ref.current.children], {
+        opacity: 0,
+        x: -40,
+      });
+
+      // 2. Orchestration
+      master
+        .to(
+          titleRef.current,
+          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
+          0.5,
+        )
+
+        // Show Unified Frontend App
+        .to(
+          ".node-unified",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          1.5,
+        )
+
+        // Show Logic & Connect App to Logic
+        .to(
+          ".node-logic",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          3.0,
+        )
+        .to(
+          staticLinesAppLogicRef.current,
+          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
+          3.5,
+        )
+        .to(flowLinesAppLogicRef.current, { opacity: 1, duration: 0.5 }, 4.5)
+        .to(
+          flowLinesAppLogicRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          4.5,
+        )
+
+        // Show Database & Connect Logic to Database
+        .to(
+          ".node-db",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          5.5,
+        )
+        .to(
+          staticLinesLogicDBRef.current,
+          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
+          6.0,
+        )
+        .to(flowLinesLogicDBRef.current, { opacity: 1, duration: 0.5 }, 7.0)
+        .to(
+          flowLinesLogicDBRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          7.0,
+        )
+
+        // Fly in badges smoothly
+        .to(
+          badges1Ref.current.children,
+          {
+            opacity: 1,
+            x: 0,
+            duration: 1,
+            stagger: 0.2,
+            ease: DS.easing.enter,
+          },
+          8.5,
+        )
+        .to(
+          badges2Ref.current.children,
+          {
+            opacity: 1,
+            x: 0,
+            duration: 1,
+            stagger: 0.2,
+            ease: DS.easing.enter,
+          },
+          10.0,
+        )
+
+        // Clean Outro
+        .addLabel("outro", 18)
+        .to(
+          masterRef.current.getChildren(),
+          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      {/* Title */}
+      <div
+        style={{
+          position: "absolute",
+          top: 100,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <div ref={titleRef}>
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 900,
+              color: DS.colors.textPrimary,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            2. Cross-Platform Approach
+          </div>
+          <div
+            style={{
+              width: 120,
+              height: 6,
+              background: DS.colors.purple,
+              marginTop: 24,
+              borderRadius: 3,
+              margin: "24px auto 0 auto",
+            }}
+          ></div>
+        </div>
+      </div>
+
+      {/* ─── LINES: APP -> LOGIC ─── */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 0,
+        }}
+      >
+        <g
+          ref={staticLinesAppLogicRef}
+          stroke={DS.colors.border}
+          strokeWidth="6"
+          fill="none"
+        >
+          <path d="M 760 520 L 1000 520" /> {/* Unified App to Logic */}
+        </g>
+      </svg>
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 1,
+        }}
+      >
+        <g
+          ref={flowLinesAppLogicRef}
+          stroke={DS.colors.purple}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="16 32"
+          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.purpleGlow})` }}
+        >
+          <path d="M 760 520 L 1000 520" />
+        </g>
+      </svg>
+
+      {/* ─── LINES: LOGIC -> DB ─── */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 0,
+        }}
+      >
+        <g
+          ref={staticLinesLogicDBRef}
+          stroke={DS.colors.border}
+          strokeWidth="6"
+          fill="none"
+        >
+          <path d="M 1200 520 L 1440 520" /> {/* Logic to DB */}
+        </g>
+      </svg>
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 1,
+        }}
+      >
+        <g
+          ref={flowLinesLogicDBRef}
+          stroke={DS.colors.purple}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray="16 32"
+          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.purpleGlow})` }}
+        >
+          <path d="M 1200 520 L 1440 520" />
+        </g>
+      </svg>
+
+      {/* ─── NODES (Safely wrapped for perfect centering) ─── */}
+      <div
+        style={{
+          position: "absolute",
+          width: "100%",
+          height: "100%",
+          zIndex: 10,
+        }}
+      >
+        {/* Unified Frontend Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 520,
+            left: 660,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className="node-unified">
+            <Box
+              icon={<IconUnifiedUI color={DS.colors.purple} />}
+              label="Web & Mobile"
+              color={DS.colors.purple}
+              glow={DS.colors.purpleGlow}
+            />
+          </div>
+        </div>
+
+        {/* Logic Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 520,
+            left: 1100,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className="node-logic">
+            <Box
+              icon={<IconLogicFlow color={DS.colors.textSecondary} />}
+              label="Logic"
+              color={DS.colors.border}
+            />
+          </div>
+        </div>
+
+        {/* Database Layer */}
+        <div
+          style={{
+            position: "absolute",
+            top: 520,
+            left: 1540,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className="node-db">
+            <Box
+              icon={<IconDBStack color={DS.colors.textSecondary} />}
+              label="Database"
+              color={DS.colors.border}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ─── BADGES ─── */}
+      {/* Notice we pass forwardRef DIRECTLY to the component, eliminating the wrapper div */}
+      <div style={{ position: "absolute", top: 320, left: 100 }}>
+        <BadgeList
+          forwardRef={badges1Ref}
+          items={[
+            { label: "Faster Development", color: DS.colors.green },
+            { label: "Good Flexibility", color: DS.colors.green },
+            { label: "Strong Performance", color: DS.colors.green },
+          ]}
+        />
+      </div>
+
+      <div style={{ position: "absolute", top: 620, left: 100 }}>
+        <BadgeList
+          forwardRef={badges2Ref}
+          items={[
+            { label: "Still Needs Coding", color: DS.colors.amber },
+            { label: "Setup & Maintenance", color: DS.colors.amber },
+          ]}
+        />
+      </div>
+    </ScaledStage>
+  );
+};
+
+// ─── SCENE 5: LOW CODE ────────────────────────────────────────────────────
+const Scene5_LowCode = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+
+  const titleRef = useRef(null),
+    panelRef = useRef(null),
+    innerElsRef = useRef(null);
+
+  const orbitGroupRef = useRef(null),
+    flowLinesPagesLogicRef = useRef(null),
+    staticLinesPagesLogicRef = useRef(null),
+    flowLinesLogicStorageRef = useRef(null),
+    staticLinesLogicStorageRef = useRef(null),
+    badgesRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      // 1. Safe GSAP Initialization
+      master.set(titleRef.current, { opacity: 0, y: -20 });
+      master.set(panelRef.current, { opacity: 0, scale: 0.9 });
+
+      master.set(".node-pages, .node-logic, .node-storage", {
+        opacity: 0,
+        scale: 0.8,
+      });
+
+      master.set(staticLinesPagesLogicRef.current, {
+        strokeDasharray: 500,
+        strokeDashoffset: 500,
+      });
+      master.set(flowLinesPagesLogicRef.current, { opacity: 0 });
+
+      master.set(staticLinesLogicStorageRef.current, {
+        strokeDasharray: 500,
+        strokeDashoffset: 500,
+      });
+      master.set(flowLinesLogicStorageRef.current, { opacity: 0 });
+
+      master.set(".orbit-badge", { opacity: 0, scale: 0 });
+
+      // We initialize the badge items explicitly to catch them
+      master.set(badgesRef.current.children, { opacity: 0, x: -40 });
+
+      // 2. Orchestration
+      master
+        .to(
+          titleRef.current,
+          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
+          0.5,
+        )
+        .to(
+          panelRef.current,
+          { opacity: 1, scale: 1, duration: 1.5, ease: DS.easing.smooth },
+          1.5,
+        )
+
+        // Show Pages
+        .to(
+          ".node-pages",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          2.5,
+        )
+
+        // Connect & Show Logic
+        .to(
+          staticLinesPagesLogicRef.current,
+          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
+          3.5,
+        )
+        .to(flowLinesPagesLogicRef.current, { opacity: 1, duration: 0.5 }, 4.0)
+        .to(
+          flowLinesPagesLogicRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          4.0,
+        )
+        .to(
+          ".node-logic",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          4.5,
+        )
+
+        // Connect & Show Storage
+        .to(
+          staticLinesLogicStorageRef.current,
+          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
+          5.5,
+        )
+        .to(
+          flowLinesLogicStorageRef.current,
+          { opacity: 1, duration: 0.5 },
+          6.0,
+        )
+        .to(
+          flowLinesLogicStorageRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          6.0,
+        )
+        .to(
+          ".node-storage",
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          6.5,
+        )
+
+        // Pop in the platform orbit badges
+        .to(
+          ".orbit-badge",
+          {
+            opacity: 1,
+            scale: 1,
+            duration: 1.2,
+            stagger: 0.2,
+            ease: DS.easing.spring,
+          },
+          8.5,
+        )
+
+        // Feature Badges on the left
+        .to(
+          badgesRef.current.children,
+          {
+            opacity: 1,
+            x: 0,
+            duration: 1.0,
+            stagger: 0.2,
+            ease: DS.easing.enter,
+          },
+          10.0,
+        )
+
+        // Clean Outro
+        .addLabel("outro", 18)
+        .to(
+          masterRef.current.getChildren(),
+          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      {/* Title */}
+      <div
+        style={{
+          position: "absolute",
+          top: 100,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <div
+          ref={titleRef}
+          style={{ opacity: 0, transform: "translateY(-20px)" }}
+        >
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 900,
+              color: DS.colors.textPrimary,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            3. Low-Code Platforms
+          </div>
+          <div
+            style={{
+              width: 120,
+              height: 6,
+              background: DS.colors.green,
+              marginTop: 24,
+              borderRadius: 3,
+              margin: "24px auto 0 auto",
+            }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Main Platform Container (Centered safely) */}
+      <div
+        style={{
+          position: "absolute",
+          top: 520,
+          left: 1100,
+          transform: "translate(-50%, -50%)",
+          zIndex: 10,
+        }}
+      >
+        <div
+          ref={panelRef}
+          style={{
+            opacity: 0,
+            transform: "scale(0.9)",
+            width: 1000,
+            height: 440,
+            background: DS.colors.panel,
+            border: `4px solid ${DS.colors.green}`,
+            borderRadius: 64,
+            boxShadow: `0 0 80px ${DS.colors.greenGlow}, inset 0 0 48px ${DS.colors.greenGlow}`,
+            position: "relative",
+          }}
+        >
+          {/* ─── LINES: PAGES -> LOGIC ─── */}
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 0,
+            }}
+          >
+            <g
+              ref={staticLinesPagesLogicRef}
+              stroke={DS.colors.green}
+              strokeWidth="6"
+              fill="none"
+              opacity="0.4"
+              strokeDasharray="500"
+              strokeDashoffset="500"
+            >
+              <path d="M 290 220 L 410 220" />
+            </g>
+          </svg>
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 1,
+            }}
+          >
+            <g
+              ref={flowLinesPagesLogicRef}
+              stroke={DS.colors.green}
+              strokeWidth="6"
+              fill="none"
+              strokeDasharray="16 32"
+              opacity="0"
+              style={{ filter: `drop-shadow(0 0 12px ${DS.colors.greenGlow})` }}
+            >
+              <path d="M 290 220 L 410 220" />
+            </g>
+          </svg>
+
+          {/* ─── LINES: LOGIC -> STORAGE ─── */}
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 0,
+            }}
+          >
+            <g
+              ref={staticLinesLogicStorageRef}
+              stroke={DS.colors.green}
+              strokeWidth="6"
+              fill="none"
+              opacity="0.4"
+              strokeDasharray="500"
+              strokeDashoffset="500"
+            >
+              <path d="M 590 220 L 710 220" />
+            </g>
+          </svg>
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 1,
+            }}
+          >
+            <g
+              ref={flowLinesLogicStorageRef}
+              stroke={DS.colors.green}
+              strokeWidth="6"
+              fill="none"
+              strokeDasharray="16 32"
+              opacity="0"
+              style={{ filter: `drop-shadow(0 0 12px ${DS.colors.greenGlow})` }}
+            >
+              <path d="M 590 220 L 710 220" />
+            </g>
+          </svg>
+
+          {/* ─── INNER NODES (Safely wrapped for perfect centering) ─── */}
+          <div
+            ref={innerElsRef}
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              zIndex: 10,
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: 220,
+                left: 200,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="node-pages"
+                style={{ opacity: 0, transform: "scale(0.8)" }}
+              >
+                <Box
+                  icon={<IconUnifiedUI color={DS.colors.green} />}
+                  label="Pages"
+                  color={DS.colors.green}
+                  glow={DS.colors.greenGlow}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                position: "absolute",
+                top: 220,
+                left: 500,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="node-logic"
+                style={{ opacity: 0, transform: "scale(0.8)" }}
+              >
+                <Box
+                  icon={<IconLogicFlow color={DS.colors.green} />}
+                  label="Logic"
+                  color={DS.colors.green}
+                  glow={DS.colors.greenGlow}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                position: "absolute",
+                top: 220,
+                left: 800,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="node-storage"
+                style={{ opacity: 0, transform: "scale(0.8)" }}
+              >
+                <Box
+                  icon={<IconDBStack color={DS.colors.green} />}
+                  label="Storage"
+                  color={DS.colors.green}
+                  glow={DS.colors.greenGlow}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ─── ORBIT BADGES (Perfectly aligned to borders) ─── */}
+          <div
+            ref={orbitGroupRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              pointerEvents: "none",
+              zIndex: 20,
+            }}
+          >
+            {/* Top Center */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div
+                className="orbit-badge"
+                style={{
+                  opacity: 0,
+                  transform: "scale(0)",
+                  padding: "16px 36px",
+                  background: DS.colors.bg,
+                  border: `4px solid ${DS.colors.border}`,
+                  borderRadius: 9999,
+                  color: DS.colors.textPrimary,
+                  fontSize: 24,
+                  fontWeight: 800,
+                  boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Power Apps
+              </div>
+            </div>
+
+            {/* Bottom Left */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 250,
+                transform: "translate(-50%, 50%)",
+              }}
+            >
+              <div
+                className="orbit-badge"
+                style={{
+                  opacity: 0,
+                  transform: "scale(0)",
+                  padding: "16px 36px",
+                  background: DS.colors.bg,
+                  border: `4px solid ${DS.colors.border}`,
+                  borderRadius: 9999,
+                  color: DS.colors.textPrimary,
+                  fontSize: 24,
+                  fontWeight: 800,
+                  boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                OutSystems
+              </div>
+            </div>
+
+            {/* Bottom Right (Mendix Highlighted) */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 750,
+                transform: "translate(-50%, 50%)",
+              }}
+            >
+              <div
+                className="orbit-badge"
+                style={{
+                  opacity: 0,
+                  transform: "scale(0)",
+                  padding: "16px 36px",
+                  background: DS.colors.bg,
+                  border: `4px solid ${DS.colors.cyan}`,
+                  borderRadius: 9999,
+                  color: DS.colors.cyan,
+                  fontSize: 24,
+                  fontWeight: 800,
+                  boxShadow: `0 0 48px ${DS.colors.cyanGlow}`,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Mendix
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── LEFT SIDEBAR BADGES ─── */}
+      <div style={{ position: "absolute", top: 380, left: 100 }}>
+        {/* Pass forwardRef directly to BadgeList! */}
+        <BadgeList
+          forwardRef={badgesRef}
+          items={[
+            { label: "Fastest Development", color: DS.colors.green },
+            { label: "No/Low Coding", color: DS.colors.green },
+            { label: "Good Performance", color: DS.colors.cyan },
+            {
+              label: "Everything is Handled by Platform",
+              color: DS.colors.green,
+            },
+          ]}
+        />
+      </div>
+    </ScaledStage>
+  );
+};
+// ─── SCENE 6: SARA & MENDIX ───────────────────────────────────────────────
+// ─── SCENE 6: SARA & MENDIX ───────────────────────────────────────────────
+const Scene6_SaraMendix = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const masterRef = useRef(null);
+
+  const saraRef = useRef(null),
+    connectorRef = useRef(null),
+    flowPathRef = useRef(null);
+  const feature1Ref = useRef(null),
+    feature2Ref = useRef(null);
+
+  // Morph refs
+  const platformContainerRef = useRef(null),
+    platformBoxRef = useRef(null);
+  const platformIconsRef = useRef(null),
+    mendixImageRef = useRef(null);
+  const mendixTextRef = useRef(null),
+    nextTextRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const master = gsap.timeline({ paused: true });
+      masterRef.current = master;
+
+      // 1. Safe GSAP Initialization (No inline transforms on animated elements)
+      master.set(saraRef.current, { opacity: 0, x: -100 });
+      master.set(platformContainerRef.current, { opacity: 0, x: 100 });
+      master.set(connectorRef.current, {
+        strokeDasharray: 850,
+        strokeDashoffset: 850,
+      });
+      master.set(flowPathRef.current, { opacity: 0 });
+      master.set(feature1Ref.current, { opacity: 0, scale: 0.8, y: 20 });
+      master.set(feature2Ref.current, { opacity: 0, scale: 0.8, y: -20 });
+      master.set(mendixImageRef.current, { opacity: 0, scale: 0.5 });
+      master.set(mendixTextRef.current, { opacity: 0, y: 30 });
+      master.set(nextTextRef.current, { opacity: 0, y: 20 });
+
+      // 2. Orchestration
+      master
+        .to(
+          saraRef.current,
+          { opacity: 1, x: 0, duration: 1.5, ease: DS.easing.spring },
+          0.5,
+        )
+        .to(
+          platformContainerRef.current,
+          { opacity: 1, x: 0, duration: 1.5, ease: DS.easing.spring },
+          1.5,
+        )
+
+        // Draw connector exactly 850px (edge of Sara to edge of Platform)
+        .to(
+          connectorRef.current,
+          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
+          3,
+        )
+
+        // Flow data
+        .to(flowPathRef.current, { opacity: 1, duration: 0.5 }, 4.5)
+        .to(
+          flowPathRef.current,
+          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
+          4.5,
+        )
+
+        // Feature cards pop out above and below the line
+        .to(
+          feature1Ref.current,
+          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: DS.easing.spring },
+          5.5,
+        )
+        .to(
+          feature2Ref.current,
+          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: DS.easing.spring },
+          6.5,
+        )
+
+        // ─── THE MORPH TRANSITION ───
+        .addLabel("morph", 11)
+
+        // 1. Fade out left elements
+        .to(
+          [
+            saraRef.current,
+            feature1Ref.current,
+            feature2Ref.current,
+            connectorRef.current,
+            flowPathRef.current,
+          ],
+          { opacity: 0, duration: 1, ease: DS.easing.smooth },
+          "morph",
+        )
+
+        // 2. Glide the container to the exact screen center (-560px from 1520 = 960)
+        .to(
+          platformContainerRef.current,
+          { x: -560, duration: 1.5, ease: DS.easing.smooth },
+          "morph",
+        )
+
+        // 3. Smoothly transform the box into the Mendix logo container
+        .to(
+          platformBoxRef.current,
+          {
+            borderColor: DS.colors.cyan,
+            boxShadow: `0 0 160px ${DS.colors.cyanGlow}, inset 0 0 64px ${DS.colors.cyanGlow}`,
+            borderRadius: 80,
+            backgroundColor: DS.colors.panel,
+            duration: 1.5,
+            ease: DS.easing.smooth,
+          },
+          "morph",
+        )
+
+        // 4. Cross-fade the icons for the actual Mendix image
+        .to(
+          platformIconsRef.current,
+          { opacity: 0, scale: 0.8, duration: 0.8, ease: DS.easing.smooth },
+          "morph",
+        )
+        .to(
+          mendixImageRef.current,
+          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
+          "morph+=0.5",
+        )
+
+        // 5. Fade in the bold text below the box
+        .to(
+          mendixTextRef.current,
+          { opacity: 1, y: 0, duration: 1.2, ease: DS.easing.enter },
+          "morph+=1",
+        )
+        .to(
+          nextTextRef.current,
+          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
+          "morph+=1.5",
+        )
+
+        // Clean outro
+        .addLabel("outro", 18.5)
+        .to(
+          masterRef.current.getChildren(),
+          { opacity: 0, duration: 1.5, ease: DS.easing.exit },
+          "outro",
+        );
+    });
+    return () => ctx.revert();
+  }, []);
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <ScaledStage>
+      {/* 1. Static & Flowing Connector Lines (Aligned exactly at y=540) */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: 1920,
+          height: 1080,
+          zIndex: 0,
+        }}
+      >
+        <path
+          ref={connectorRef}
+          d="M 490 540 L 1340 540"
+          stroke={DS.colors.green}
+          strokeWidth="8"
+          fill="none"
+        />
+        <path
+          ref={flowPathRef}
+          d="M 490 540 L 1340 540"
+          stroke="#FFFFFF"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray="16 48"
+          style={{ filter: `drop-shadow(0 0 16px #FFFFFF)` }}
+        />
+      </svg>
+
+      {/* 2. SARA NODE (Strict absolute geometry. Center of circle is mathematically locked to 540) */}
+      <div style={{ position: "absolute", top: 540, left: 400, zIndex: 10 }}>
+        <div ref={saraRef}>
+          {/* Sara Circle */}
+          <div
+            style={{
+              position: "absolute",
+              transform: "translate(-50%, -50%)",
+              width: 180,
+              height: 180,
+              background: DS.colors.card,
+              border: `6px solid ${DS.colors.border}`,
+              borderRadius: "50%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
+            }}
+          >
+            <svg
+              width="100"
+              height="100"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={DS.colors.textPrimary}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+
+          {/* Sara Label (Positioned safely below the exact center) */}
+          <div
+            style={{
+              position: "absolute",
+              top: 120,
+              transform: "translateX(-50%)",
+              padding: "16px 40px",
+              background: DS.colors.panel,
+              border: `2px solid ${DS.colors.border}`,
+              borderRadius: 9999,
+              color: DS.colors.textPrimary,
+              fontSize: 26,
+              fontWeight: 700,
+              boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Sara / Shop Owner
+          </div>
+        </div>
+      </div>
+
+      {/* 3. FLOATING FEATURES */}
+      <div style={{ position: "absolute", top: 440, left: 915, zIndex: 5 }}>
+        <div
+          ref={feature1Ref}
+          style={{
+            position: "absolute",
+            transform: "translate(-50%, -50%)",
+            padding: "16px 32px",
+            background: DS.colors.bg,
+            border: `2px solid ${DS.colors.green}`,
+            borderRadius: 16,
+            color: DS.colors.green,
+            fontSize: 28,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 24px ${DS.colors.greenGlow}`,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Faster Building
+        </div>
+      </div>
+
+      <div style={{ position: "absolute", top: 640, left: 915, zIndex: 5 }}>
+        <div
+          ref={feature2Ref}
+          style={{
+            position: "absolute",
+            transform: "translate(-50%, -50%)",
+            padding: "16px 32px",
+            background: DS.colors.bg,
+            border: `2px solid ${DS.colors.cyan}`,
+            borderRadius: 16,
+            color: DS.colors.cyan,
+            fontSize: 28,
+            fontWeight: 800,
+            textTransform: "uppercase",
+            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 24px ${DS.colors.cyanGlow}`,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Simpler Setup
+        </div>
+      </div>
+
+      {/* 4. PLATFORM & MENDIX MORPH CONTAINER */}
+      <div style={{ position: "absolute", top: 540, left: 1520, zIndex: 20 }}>
+        <div ref={platformContainerRef}>
+          {/* The Morphing Box (Center strictly locked) */}
+          <div
+            ref={platformBoxRef}
+            style={{
+              position: "absolute",
+              transform: "translate(-50%, -50%)",
+              width: 360,
+              height: 360,
+              background: DS.colors.card,
+              border: `6px solid ${DS.colors.green}`,
+              borderRadius: 64,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              boxShadow: `0 24px 80px rgba(0,0,0,0.6), 0 0 64px ${DS.colors.greenGlow}`,
+            }}
+          >
+            {/* Outgoing Icons */}
+            <div
+              ref={platformIconsRef}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              <IconUnifiedUI color={DS.colors.green} />
+              <div style={{ display: "flex", gap: 32, marginTop: 40 }}>
+                <IconLogicFlow color={DS.colors.green} />
+                <IconDBStack color={DS.colors.green} />
+              </div>
+            </div>
+
+            {/* Incoming Mendix Image */}
+            <div ref={mendixImageRef} style={{ position: "absolute" }}>
+              <img
+                src={staticFile("mendix.png")}
+                alt="Mendix Logo"
+                style={{ width: 300, height: 300, objectFit: "contain" }}
+              />
+            </div>
+          </div>
+
+          {/* Morphing text below box (220px below center places it 40px below the box edge) */}
+          <div
+            ref={mendixTextRef}
+            style={{
+              position: "absolute",
+              top: 220,
+              transform: "translateX(-50%)",
+              fontSize: 80,
+              fontWeight: 900,
+              color: DS.colors.textPrimary,
+              letterSpacing: "-0.02em",
+              textShadow: `0 0 24px ${DS.colors.cyanGlow}`,
+            }}
+          >
+            MENDIX
+          </div>
+        </div>
+      </div>
+
+      {/* 5. NEXT CAPTION */}
+      <div style={{ position: "absolute", bottom: 120, left: 960, zIndex: 20 }}>
+        <div
+          ref={nextTextRef}
+          style={{
+            position: "absolute",
+            transform: "translate(-50%, 0)",
+            fontSize: 40,
+            fontWeight: 700,
+            color: DS.colors.textSecondary,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Next: Discover Mendix
+        </div>
+      </div>
+    </ScaledStage>
+  );
+};
+// ─── MAIN ORCHESTRATOR ────────────────────────────────────────────────────
+export default function MainScene() {
+  return (
+    <AbsoluteFill style={{ backgroundColor: DS.colors.bg }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+        * { box-sizing: border-box; }
+      `}</style>
+
+      <Sequence from={0} durationInFrames={360}>
+        <Scene1_WelcomeBack />
+      </Sequence>
+      <Sequence from={360} durationInFrames={300}>
+        <Scene2_HighLevel />
+      </Sequence>
+      <Sequence from={660} durationInFrames={1170}>
+        <Scene3_Traditional />
+      </Sequence>
+      <Sequence from={1830} durationInFrames={1170}>
+        <Scene4_CrossPlatform />
+      </Sequence>
+      <Sequence from={3000} durationInFrames={1170}>
+        <Scene5_LowCode />
+      </Sequence>
+      <Sequence from={4170} durationInFrames={1200}>
+        <Scene6_SaraMendix />
+      </Sequence>
+    </AbsoluteFill>
+  );
+}
