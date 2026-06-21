@@ -1,64 +1,82 @@
-import React, { useLayoutEffect, useEffect, useRef } from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
-import { staticFile } from "remotion";
 import {
-  useCurrentFrame,
-  useVideoConfig,
   Sequence,
   AbsoluteFill,
-  ScaledStages,
+  useVideoConfig,
+  useCurrentFrame,
+  Img,
+  staticFile,
 } from "remotion";
 
-// ─── DESIGN SYSTEM ────────────────────────────────────────────────────────
+// 1. FIX: Enabled force3D. This offloads the 4K animation rendering to the GPU, entirely fixing the lag.
+gsap.config({ force3D: true });
+
+// 2. Disable GSAP's internal ticker so it doesn't fight Remotion's frame engine
+gsap.ticker.sleep();
+gsap.ticker.lagSmoothing(0);
+
 const DS = {
   colors: {
     bg: "#0B0F19",
     panel: "#0F172A",
-    card: "#1E293B",
-    border: "#334155",
+    cardBase: "#1E293B",
+    cardElevated: "#243347",
+    borderDefault: "#334155",
+    borderBright: "#475569",
     textPrimary: "#F8FAFC",
     textSecondary: "#94A3B8",
-    cyan: "#38BDF8",
-    cyanGlow: "rgba(56,189,248,0.2)",
-    purple: "#A78BFA",
-    purpleGlow: "rgba(167,139,250,0.2)",
-    green: "#34D399",
-    greenGlow: "rgba(52,211,153,0.2)",
-    amber: "#FBBF24",
-    rose: "#FB7185",
-  },
-  font: {
-    family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  easing: {
-    enter: "power3.out",
-    exit: "power3.in",
-    smooth: "power2.inOut",
-    spring: "elastic.out(1, 0.8)",
-    slowFlow: "none",
+    cyan: { base: "#38BDF8", glow: "rgba(56,189,248,0.15)", bright: "#7DD3FC" },
+    purple: {
+      base: "#A78BFA",
+      glow: "rgba(167,139,250,0.15)",
+      bright: "#C4B5FD",
+    },
+    green: {
+      base: "#34D399",
+      glow: "rgba(52,211,153,0.15)",
+      bright: "#6EE7B7",
+    },
+    amber: {
+      base: "#FBBF24",
+      glow: "rgba(251,191,36,0.15)",
+      bright: "#FDE68A",
+    },
+    rose: {
+      base: "#FB7185",
+      glow: "rgba(251,113,133,0.15)",
+      bright: "#FCA5A5",
+    },
+    mendix: {
+      base: "#285192",
+      glow: "rgba(74,128,212,0.3)",
+      bright: "#4A80D4",
+    },
   },
 };
 
-// ─── UTILITY COMPONENTS ───────────────────────────────────────────────────
-const ScaledStage = ({ children }) => {
-  const { width, height } = useVideoConfig();
-  const scale = Math.min(width / 1920, height / 1080);
+// ── PRIMITIVE COMPONENTS ────────────────────────────────────
+const Stage = ({ children }) => {
+  const { width } = useVideoConfig();
+  const scale = width / 1920;
+
   return (
     <AbsoluteFill
       style={{
         backgroundColor: DS.colors.bg,
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: DS.font.family,
+        overflow: "hidden",
+        fontFamily: "'Inter', sans-serif",
       }}
     >
       <div
         style={{
           width: 1920,
           height: 1080,
-          position: "relative",
-          transform: `scale(${scale})`,
-          overflow: "hidden",
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: "center center",
         }}
       >
         {children}
@@ -67,2081 +85,1253 @@ const ScaledStage = ({ children }) => {
   );
 };
 
-// ─── ENHANCED ICONS FOR VISUALIZATION ─────────────────────────────────────
-const IconWebUI = ({ color }) => (
-  <svg
-    width="72"
-    height="72"
-    viewBox="0 0 64 64"
-    fill="none"
-    stroke={color}
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+const Card = ({ children, className = "", style }) => (
+  <div
+    className={className}
+    style={{
+      background: DS.colors.cardBase,
+      border: `1px solid ${DS.colors.borderDefault}`,
+      borderRadius: 16,
+      padding: 32,
+      boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+      position: "absolute",
+      ...style,
+    }}
   >
-    <rect x="4" y="12" width="56" height="40" rx="4" />
-    <path d="M4 22h56" />
-    <circle cx="12" cy="17" r="1.5" fill={color} />
-    <circle cx="18" cy="17" r="1.5" fill={color} />
-    <rect
-      x="10"
-      y="28"
-      width="16"
-      height="16"
-      rx="2"
-      fill={color}
-      fillOpacity="0.2"
-      stroke="none"
-    />
-    <rect x="32" y="28" width="22" height="4" rx="2" />
-    <rect x="32" y="36" width="14" height="4" rx="2" />
-    <rect x="32" y="44" width="18" height="4" rx="2" />
-  </svg>
+    {children}
+  </div>
 );
 
-const IconMobileUI = ({ color }) => (
-  <svg
-    width="72"
-    height="72"
-    viewBox="0 0 64 64"
-    fill="none"
-    stroke={color}
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+const Badge = ({ label, color = DS.colors.cyan, className = "", style }) => (
+  <div
+    className={className}
+    style={{
+      background: color.glow,
+      border: `1px solid ${color.base}`,
+      borderRadius: 9999,
+      padding: "8px 20px",
+      fontSize: 18,
+      fontWeight: 600,
+      color: color.base,
+      position: "absolute",
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      whiteSpace: "nowrap",
+      ...style,
+    }}
   >
-    <rect x="18" y="6" width="28" height="52" rx="6" />
-    <path d="M28 12h8" />
-    <circle
-      cx="32"
-      cy="24"
-      r="6"
-      fill={color}
-      fillOpacity="0.2"
-      stroke="none"
-    />
-    <rect x="24" y="36" width="16" height="3" rx="1.5" />
-    <rect x="24" y="42" width="12" height="3" rx="1.5" />
-    <rect x="26" y="52" width="12" height="2" rx="1" fill={color} />
-  </svg>
+    {label}
+  </div>
 );
 
-const IconUnifiedUI = ({ color }) => (
+// ── ICONS ───────────────────────────────────────────────────
+const IconGlobe = () => (
+  <svg
+    width="64"
+    height="64"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#38BDF8"
+    strokeWidth="1.5"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <path d="M2 12h20" />
+  </svg>
+);
+const IconBuilding = () => (
+  <svg
+    width="64"
+    height="64"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#A78BFA"
+    strokeWidth="1.5"
+  >
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M16 10h.01M8 10h.01M8 14h.01M12 14h.01M16 14h.01" />
+  </svg>
+);
+const IconUsers = () => (
+  <svg
+    width="64"
+    height="64"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#34D399"
+    strokeWidth="1.5"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+const IconDevices = () => (
+  <svg
+    width="64"
+    height="64"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#FBBF24"
+    strokeWidth="1.5"
+  >
+    <rect x="2" y="4" width="14" height="12" rx="2" />
+    <path d="M0 20h18M16 8h6v12h-6z" />
+  </svg>
+);
+const IconLightning = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.amber.base}
+    strokeWidth="2"
+  >
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+const IconStairs = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.green.base}
+    strokeWidth="2"
+  >
+    <path d="M2 22h6v-6h6v-6h6V4" />
+  </svg>
+);
+const IconHand = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.purple.base}
+    strokeWidth="2"
+  >
+    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0a2 2 0 0 0-2 2v0a2 2 0 0 0-2 2v-5a2 2 0 0 0-4 0v12a7 7 0 0 0 14 0z" />
+  </svg>
+);
+const IconDevicesCyan = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.cyan.base}
+    strokeWidth="2"
+  >
+    <rect x="2" y="4" width="14" height="12" rx="2" />
+    <path d="M0 20h18M16 8h6v12h-6z" />
+  </svg>
+);
+const IconGear = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.rose.base}
+    strokeWidth="2"
+  >
+    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+const IconCode = () => (
+  <svg
+    width="60"
+    height="60"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.mendix.bright}
+    strokeWidth="2"
+  >
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </svg>
+);
+const IconLaptop = () => (
+  <svg
+    width="120"
+    height="120"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={DS.colors.textPrimary}
+    strokeWidth="1.5"
+  >
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M2 20h20" />
+    <path d="M5 8h14M5 12h10" stroke={DS.colors.cyan.base} strokeWidth="2" />
+  </svg>
+);
+const IconPhone = () => (
   <svg
     width="80"
     height="80"
-    viewBox="0 0 64 64"
+    viewBox="0 0 24 24"
     fill="none"
-    stroke={color}
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
+    stroke={DS.colors.textPrimary}
+    strokeWidth="1.5"
   >
-    {/* Web Frame */}
-    <rect x="4" y="14" width="40" height="30" rx="3" />
-    <path d="M4 22h40" />
-    <rect
-      x="10"
-      y="28"
-      width="12"
-      height="10"
-      rx="2"
-      fill={color}
-      fillOpacity="0.2"
-      stroke="none"
-    />
-    <rect x="26" y="28" width="14" height="3" rx="1.5" />
-    <rect x="26" y="34" width="10" height="3" rx="1.5" />
-    {/* Mobile Frame Overlap */}
-    <rect
-      x="36"
-      y="24"
-      width="22"
-      height="34"
-      rx="4"
-      fill={DS.colors.card}
-      strokeWidth="2"
-    />
-    <circle
-      cx="47"
-      cy="34"
-      r="4"
-      fill={color}
-      fillOpacity="0.2"
-      stroke="none"
-    />
-    <rect x="42" y="42" width="10" height="2" rx="1" />
-    <rect x="42" y="47" width="7" height="2" rx="1" />
+    <rect x="5" y="2" width="14" height="20" rx="2" />
+    <path d="M9 6h6M9 10h4" stroke={DS.colors.cyan.base} strokeWidth="2" />
   </svg>
 );
-
-const IconLogicFlow = ({ color }) => (
+const IconLightbulb = () => (
   <svg
-    width="72"
-    height="72"
-    viewBox="0 0 64 64"
+    width="80"
+    height="80"
+    viewBox="0 0 24 24"
     fill="none"
-    stroke={color}
+    stroke={DS.colors.amber.bright}
     strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
   >
-    <rect x="8" y="24" width="16" height="16" rx="4" />
-    <rect x="40" y="10" width="16" height="16" rx="4" />
-    <rect x="40" y="38" width="16" height="16" rx="4" />
-    <path d="M24 32h8v-14h8" />
-    <path d="M24 32h8v14h8" />
-    <circle cx="32" cy="32" r="3" fill={color} stroke="none" />
+    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5" />
+    <path d="M9 18h6M10 22h4" />
   </svg>
 );
-
-const IconDBStack = ({ color }) => (
+const IconRocket = () => (
   <svg
-    width="72"
-    height="72"
-    viewBox="0 0 64 64"
+    width="80"
+    height="80"
+    viewBox="0 0 24 24"
     fill="none"
-    stroke={color}
+    stroke={DS.colors.cyan.bright}
     strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
   >
-    <ellipse cx="32" cy="18" rx="16" ry="6" />
-    <path d="M48 18v14c0 3.3-7.2 6-16 6s-16-2.7-16-6V18" />
-    <path d="M48 32v14c0 3.3-7.2 6-16 6s-16-2.7-16-6V32" />
-    <line
-      x1="32"
-      y1="24"
-      x2="32"
-      y2="24.1"
-      strokeWidth="4"
-      strokeLinecap="round"
-    />
-    <line
-      x1="32"
-      y1="38"
-      x2="32"
-      y2="38.1"
-      strokeWidth="4"
-      strokeLinecap="round"
-    />
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+    <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
   </svg>
 );
 
-const Box = ({ icon, label, color, glow }) => (
-  <div
-    style={{
-      width: 200,
-      height: 200,
-      background: DS.colors.card,
-      border: `2px solid ${color}`,
-      borderRadius: 32,
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "center",
-      alignItems: "center",
-      boxShadow: glow
-        ? `0 0 32px ${glow}, 0 12px 32px rgba(0,0,0,0.5)`
-        : `0 12px 32px rgba(0,0,0,0.5)`,
-      zIndex: 10,
-    }}
-  >
-    {icon}
-    <div
-      style={{
-        marginTop: 24,
-        fontSize: 18,
-        fontWeight: 700,
-        color: DS.colors.textPrimary,
-        letterSpacing: "0.02em",
-      }}
-    >
-      {label}
-    </div>
-  </div>
-);
-
-// ─── UPDATED BADGELIST (With Inline Flicker Prevention) ───────────────────
-const BadgeList = ({ forwardRef, items }) => (
-  <div
-    ref={forwardRef}
-    style={{ display: "flex", flexDirection: "column", gap: 24 }}
-  >
-    {items.map((item, i) => (
-      <div
-        key={i}
-        style={{
-          opacity: 0, // Prevent Flicker
-          transform: "translateX(-40px)", // Prevent Flicker
-          padding: "18px 32px",
-          background: DS.colors.card,
-          borderLeft: `6px solid ${item.color}`,
-          fontSize: 24,
-          fontWeight: 600,
-          color: DS.colors.textPrimary,
-          borderRadius: "0 16px 16px 0",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {item.label}
-      </div>
-    ))}
-  </div>
-);
-// ─── SCENE 1: WELCOME BACK ────────────────────────────────────────────────
-const Scene1_WelcomeBack = () => {
+// ── SCENE 0: WELCOME BACK ───────────────────────────────────
+const Scene0_WelcomeBack = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-  const text1Ref = useRef(null),
-    text2Ref = useRef(null);
-  const containerRef = useRef(null);
+  const ref = useRef(null);
+  const master = useRef(null);
 
   useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
-
-      // Safe GSAP Initialization (Replaces inline CSS transforms)
-      master.set([text1Ref.current, text2Ref.current], {
-        opacity: 0,
-        y: 40,
-        scale: 0.95,
-      });
-      master.set(containerRef.current, { scale: 1 });
-
-      master
-        // Cinematic ambient zoom on the entire container
-
-        // Sequence in elements
-        .to(
-          text1Ref.current,
-          { opacity: 1, y: 0, scale: 1, duration: 1.5, ease: DS.easing.enter },
-          0.5,
-        )
-        .to(
-          text2Ref.current,
-          { opacity: 1, y: 0, scale: 1, duration: 1.5, ease: DS.easing.enter },
-          1.5,
-        )
-
-        // Clean outro
-        .addLabel("outro", 4.5)
-        .to(
-          [text1Ref.current, text2Ref.current],
-          {
-            opacity: 0,
-            y: -40,
-            duration: 1.5,
-            ease: DS.easing.exit,
-            stagger: 0.2,
-          },
-          "outro",
-        );
-    });
+    let ctx = gsap.context(() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(
+        ".s0-target",
+        { opacity: 0, scale: 0.93, y: 30 },
+        { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: "expo.out" },
+        0.2,
+      ).to(
+        ".s0-target",
+        { opacity: 0, y: -30, duration: 0.6, ease: "power2.in" },
+        3.2,
+      );
+      master.current = tl;
+    }, ref);
     return () => ctx.revert();
   }, []);
 
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
+  useLayoutEffect(() => {
+    if (master.current) master.current.seek(frame / fps);
   }, [frame, fps]);
 
   return (
-    <ScaledStage>
+    <Stage>
       <div
-        ref={containerRef}
+        ref={ref}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
+          width: "100%",
+          height: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         <h1
-          ref={text1Ref}
+          className="s0-target"
           style={{
+            opacity: 0,
             fontSize: 96,
-            fontWeight: 900,
+            fontWeight: 800,
             color: DS.colors.textPrimary,
             margin: 0,
-            letterSpacing: "-0.02em",
-            textShadow: `0 12px 48px rgba(0,0,0,0.6)`, // Added depth
           }}
         >
           Welcome back!
         </h1>
-        <h2
-          ref={text2Ref}
-          style={{
-            fontSize: 44,
-            fontWeight: 400,
-            color: DS.colors.textSecondary,
-            margin: "32px 0 0 0",
-          }}
-        >
-          Let’s look at the different ways we have to build an app.
-        </h2>
       </div>
-    </ScaledStage>
+    </Stage>
   );
 };
 
-// ─── SCENE 2: ON A HIGH LEVEL ─────────────────────────────────────────────
-const Scene2_HighLevel = () => {
+// ── SCENE 1: WHAT IS MENDIX ─────────────────────────────────
+// ── SCENE 1: WHAT IS MENDIX ─────────────────────────────────
+const Scene1_WhatIsMendix = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-  const badgeRef = useRef(null),
-    textRef = useRef(null),
-    glowRef = useRef(null);
+  const containerRef = useRef(null);
+  const master = useRef(null);
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
+      const tl = gsap.timeline({ paused: true });
 
-      // Safe GSAP Initialization
-      master.set(badgeRef.current, { opacity: 0, scale: 0.8, y: 30 });
-      master.set(textRef.current, { opacity: 0, scale: 0.95, y: 30 });
-      master.set(glowRef.current, { opacity: 0, scale: 0.5 });
-
-      master
-        // Reveal a subtle ambient backlight for the badge
-        .to(
-          glowRef.current,
-          { opacity: 0.4, scale: 1, duration: 2, ease: DS.easing.smooth },
-          0.2,
-        )
-
-        // Snap elements in
-        .to(
-          badgeRef.current,
-          { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: DS.easing.spring },
-          0.5,
-        )
-        .to(
-          textRef.current,
-          { opacity: 1, scale: 1, y: 0, duration: 1.2, ease: DS.easing.enter },
+      // 1. Title group animation
+      tl.fromTo(
+        ".s1-title-group",
+        { opacity: 0, y: 40, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 1.4, ease: "expo.out" },
+        0.5,
+      )
+        // 2. Main paragraph body animation
+        .fromTo(
+          ".s1-paragraph",
+          { opacity: 0, scale: 0.97 },
+          { opacity: 0.8, scale: 1, duration: 1.5, ease: "power2.out" },
           1.2,
         )
-
-        // Clean outro
-        .addLabel("outro", 4)
+        // 3. Card 0: 4,000+ Orgs lands
+        .fromTo(
+          ".s1-card-0",
+          { opacity: 0, y: 60, scale: 0.88 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.1, ease: "back.out(1.2)" },
+          2.4,
+        )
+        // 4. Card 1: 100+ Countries lands
+        .fromTo(
+          ".s1-card-1",
+          { opacity: 0, y: 60, scale: 0.88 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.1, ease: "back.out(1.2)" },
+          3.6,
+        )
+        // 5. INTERSTITIAL: Global Enterprise Logos reveal smoothly right below the cards
+        .fromTo(
+          ".s1-logos-container",
+          { opacity: 0, y: 25, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power4.out" },
+          4.7,
+        )
+        // 6. Card 2: 300k+ Devs lands after a perfect sync gap
+        .fromTo(
+          ".s1-card-2",
+          { opacity: 0, y: 60, scale: 0.88 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.1, ease: "back.out(1.2)" },
+          6.4,
+        )
+        // 7. Card 3: ~1M Apps lands
+        .fromTo(
+          ".s1-card-3",
+          { opacity: 0, y: 60, scale: 0.88 },
+          { opacity: 1, y: 0, scale: 1, duration: 1.1, ease: "back.out(1.2)" },
+          7.6,
+        )
+        // 8. Dynamic full scene exit animation (Extended slightly to accommodate new content)
         .to(
-          [badgeRef.current, textRef.current, glowRef.current],
+          [
+            ".s1-title-group",
+            ".s1-paragraph",
+            "[class^='s1-card-']",
+            ".s1-logos-container",
+          ],
           {
             opacity: 0,
-            y: -30,
-            scale: 0.95,
-            duration: 1,
-            ease: DS.easing.exit,
-            stagger: 0.1,
+            y: -40,
+            duration: 0.8,
+            stagger: 0.04,
+            ease: "power3.inOut",
           },
-          "outro",
+          13.2,
         );
-    });
+
+      master.current = tl;
+    }, containerRef);
+
     return () => ctx.revert();
   }, []);
 
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
+  useLayoutEffect(() => {
+    if (master.current) master.current.seek(frame / fps);
   }, [frame, fps]);
 
+  const stats = [
+    {
+      label: "4,000+ Orgs",
+      Icon: IconBuilding,
+      color: "#A78BFA",
+      bg: "rgba(167,139,250,0.07)",
+    },
+    {
+      label: "100+ Countries",
+      Icon: IconGlobe,
+      color: "#38BDF8",
+      bg: "rgba(56,189,248,0.07)",
+    },
+    {
+      label: "300k+ Devs",
+      Icon: IconUsers,
+      color: "#34D399",
+      bg: "rgba(52,211,153,0.07)",
+    },
+    {
+      label: "~1M Apps",
+      Icon: IconDevices,
+      color: "#FBBF24",
+      bg: "rgba(251,191,36,0.07)",
+    },
+  ];
+
   return (
-    <ScaledStage>
+    <Stage>
       <div
+        ref={containerRef}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
+          width: "100%",
+          height: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
+          gap: 56,
         }}
       >
-        {/* Cinematic ambient backlight behind badge */}
+        {/* TITLE SECTION */}
         <div
-          ref={glowRef}
-          style={{
-            position: "absolute",
-            width: 400,
-            opacity: 0,
-            height: 160,
-            background: DS.colors.cyan,
-            filter: "blur(80px)",
-            transform: "translateY(-40px) scale(0.5)",
-            zIndex: 0,
-            borderRadius: "50%",
-          }}
-        />
-
-        <div
-          ref={badgeRef}
-          style={{
-            zIndex: 10,
-            padding: "16px 40px",
-            background: DS.colors.panel,
-            border: `2px solid ${DS.colors.cyan}`,
-            borderRadius: 9999,
-            color: DS.colors.cyan,
-            fontSize: 24,
-            fontWeight: 800,
-            textTransform: "uppercase",
-            opacity: 0, // <-- ADD THIS
-            transform: "scale(0.8) translateY(30px)", // <-- ADD THIS
-            letterSpacing: "0.1em",
-            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 32px ${DS.colors.cyanGlow}, inset 0 0 16px ${DS.colors.cyanGlow}`,
-          }}
+          className="s1-title-group"
+          style={{ opacity: 0, display: "flex", alignItems: "center", gap: 32 }}
         >
-          On a high level
-        </div>
-
-        <h3
-          ref={textRef}
-          style={{
-            zIndex: 10,
-            fontSize: 56,
-            fontWeight: 700,
-            color: DS.colors.textPrimary,
-            margin: "40px 0 0 0",
-            textShadow: `0 12px 48px rgba(0,0,0,0.6)`,
-            opacity: 0, // <-- ADD THIS
-            transform: "scale(0.95) translateY(30px)", // <-- ADD THIS
-          }}
-        >
-          There are three main ways
-        </h3>
-      </div>
-    </ScaledStage>
-  );
-};
-
-// ─── SCENE 3: TRADITIONAL ─────────────────────────────────────────────────
-const Scene3_Traditional = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-
-  const titleRef = useRef(null);
-  const staticLinesAppLogicRef = useRef(null),
-    flowLinesAppLogicRef = useRef(null);
-  const staticLinesLogicDBRef = useRef(null),
-    flowLinesLogicDBRef = useRef(null);
-  const badges1Ref = useRef(null),
-    badges2Ref = useRef(null);
-
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
-
-      master
-        // 1. Bring in the title
-        .to(
-          titleRef.current,
-          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
-          0.5,
-        )
-
-        // 2. Show Frontend Apps (Web & Mobile)
-        .to(
-          [".node-web", ".node-mobile"],
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 1.2,
-            stagger: 0.2,
-            ease: DS.easing.spring,
-          },
-          1.5,
-        )
-
-        // 3. Draw lines to Logic, then pop Logic in
-        .to(
-          staticLinesAppLogicRef.current,
-          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
-          2.5,
-        )
-        .to(
-          ".node-logic",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          3.0,
-        )
-        .to(flowLinesAppLogicRef.current, { opacity: 1, duration: 0.5 }, 3.5)
-        .to(
-          flowLinesAppLogicRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          3.5,
-        )
-
-        // 4. Draw lines to Database, then pop Database in
-        .to(
-          staticLinesLogicDBRef.current,
-          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
-          4.5,
-        )
-        .to(
-          ".node-db",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          5.0,
-        )
-        .to(flowLinesLogicDBRef.current, { opacity: 1, duration: 0.5 }, 5.5)
-        .to(
-          flowLinesLogicDBRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          5.5,
-        )
-
-        // 5. Fly in the left-side badges sequentially
-        .to(
-          badges1Ref.current.children,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 1.0,
-            stagger: 0.2,
-            ease: DS.easing.enter,
-          },
-          7.0,
-        )
-        .to(
-          badges2Ref.current.children,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 1.0,
-            stagger: 0.2,
-            ease: DS.easing.enter,
-          },
-          8.5,
-        )
-
-        // 6. Clean Outro
-        .addLabel("outro", 18)
-        .to(
-          masterRef.current.getChildren(),
-          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
-          "outro",
-        );
-    });
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
-  }, [frame, fps]);
-
-  return (
-    <ScaledStage>
-      {/* ─── TITLE ─── */}
-      <div
-        style={{
-          position: "absolute",
-          top: 100,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          ref={titleRef}
-          style={{ opacity: 0, transform: "translateY(-20px)" }}
-        >
-          <div
+          <Img
+            src={staticFile("mendix.png")}
+            style={{ width: 120, height: 120, objectFit: "contain" }}
+          />
+          <h1
             style={{
-              fontSize: 64,
-              fontWeight: 900,
-              color: DS.colors.textPrimary,
-              letterSpacing: "-0.02em",
+              fontSize: 96,
+              fontWeight: 800,
+              color: "#F8FAFC",
+              margin: 0,
             }}
           >
-            1. Traditional Approach
-          </div>
-          <div
-            style={{
-              width: 120,
-              height: 6,
-              background: DS.colors.cyan,
-              marginTop: 24,
-              borderRadius: 3,
-              margin: "24px auto 0 auto",
-            }}
-          ></div>
-        </div>
-      </div>
-
-      {/* ─── LINES: APP -> LOGIC ─── */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 0,
-        }}
-      >
-        <g
-          ref={staticLinesAppLogicRef}
-          stroke={DS.colors.border}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="500"
-          strokeDashoffset="500"
-        >
-          <path d="M 760 360 L 1000 520" /> {/* Web to Logic */}
-          <path d="M 760 680 L 1000 520" /> {/* Mobile to Logic */}
-        </g>
-      </svg>
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 1,
-        }}
-      >
-        <g
-          ref={flowLinesAppLogicRef}
-          stroke={DS.colors.cyan}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="16 32"
-          opacity="0"
-          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.cyanGlow})` }}
-        >
-          <path d="M 760 360 L 1000 520" />
-          <path d="M 760 680 L 1000 520" />
-        </g>
-      </svg>
-
-      {/* ─── LINES: LOGIC -> DB ─── */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 0,
-        }}
-      >
-        <g
-          ref={staticLinesLogicDBRef}
-          stroke={DS.colors.border}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="500"
-          strokeDashoffset="500"
-        >
-          <path d="M 1200 520 L 1440 520" /> {/* Logic to DB */}
-        </g>
-      </svg>
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 1,
-        }}
-      >
-        <g
-          ref={flowLinesLogicDBRef}
-          stroke={DS.colors.cyan}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="16 32"
-          opacity="0"
-          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.cyanGlow})` }}
-        >
-          <path d="M 1200 520 L 1440 520" />
-        </g>
-      </svg>
-
-      {/* ─── NODES (Structure separates positioning from GSAP scaling) ─── */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          zIndex: 10,
-        }}
-      >
-        {/* Frontend Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 360,
-            left: 660,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            className="node-web"
-            style={{ opacity: 0, transform: "scale(0.8)" }}
-          >
-            <Box
-              icon={<IconWebUI color={DS.colors.cyan} />}
-              label="Web App"
-              color={DS.colors.cyan}
-              glow={DS.colors.cyanGlow}
-            />
-          </div>
+            What is Mendix?
+          </h1>
         </div>
 
-        <div
-          style={{
-            position: "absolute",
-            top: 680,
-            left: 660,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            className="node-mobile"
-            style={{ opacity: 0, transform: "scale(0.8)" }}
-          >
-            <Box
-              icon={<IconMobileUI color={DS.colors.cyan} />}
-              label="Mobile App"
-              color={DS.colors.cyan}
-              glow={DS.colors.cyanGlow}
-            />
-          </div>
-        </div>
-
-        {/* Logic Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 520,
-            left: 1100,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            className="node-logic"
-            style={{ opacity: 0, transform: "scale(0.8)" }}
-          >
-            <Box
-              icon={<IconLogicFlow color={DS.colors.textSecondary} />}
-              label="Logic"
-              color={DS.colors.border}
-            />
-          </div>
-        </div>
-
-        {/* Database Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 520,
-            left: 1540,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            className="node-db"
-            style={{ opacity: 0, transform: "scale(0.8)" }}
-          >
-            <Box
-              icon={<IconDBStack color={DS.colors.textSecondary} />}
-              label="Database"
-              color={DS.colors.border}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ─── BADGES ─── */}
-      <div style={{ position: "absolute", top: 320, left: 100 }}>
-        <BadgeList
-          forwardRef={badges1Ref}
-          items={[
-            { label: "High Flexibility", color: DS.colors.green },
-            { label: "Strong Performance", color: DS.colors.green },
-          ]}
-        />
-      </div>
-
-      <div style={{ position: "absolute", top: 580, left: 100 }}>
-        <BadgeList
-          forwardRef={badges2Ref}
-          items={[
-            { label: "Heavy Coding", color: DS.colors.amber },
-            { label: "More Configuration", color: DS.colors.amber },
-            { label: "High Maintenance", color: DS.colors.amber },
-          ]}
-        />
-      </div>
-    </ScaledStage>
-  );
-};
-// ─── SCENE 4: CROSS PLATFORM ──────────────────────────────────────────────
-const Scene4_CrossPlatform = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-
-  const titleRef = useRef(null);
-  const staticLinesAppLogicRef = useRef(null),
-    flowLinesAppLogicRef = useRef(null);
-  const staticLinesLogicDBRef = useRef(null),
-    flowLinesLogicDBRef = useRef(null);
-  const badges1Ref = useRef(null),
-    badges2Ref = useRef(null);
-
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
-
-      // 1. Safe Initialization using GSAP (No inline transforms on animated elements)
-      master.set(titleRef.current, { opacity: 0, y: -20 });
-      master.set(".node-unified, .node-logic, .node-db", {
-        opacity: 0,
-        scale: 0.8,
-      });
-
-      master.set(staticLinesAppLogicRef.current, {
-        strokeDasharray: 500,
-        strokeDashoffset: 500,
-      });
-      master.set(flowLinesAppLogicRef.current, { opacity: 0 });
-
-      master.set(staticLinesLogicDBRef.current, {
-        strokeDasharray: 500,
-        strokeDashoffset: 500,
-      });
-      master.set(flowLinesLogicDBRef.current, { opacity: 0 });
-
-      master.set([badges1Ref.current.children, badges2Ref.current.children], {
-        opacity: 0,
-        x: -40,
-      });
-
-      // 2. Orchestration
-      master
-        .to(
-          titleRef.current,
-          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
-          0.5,
-        )
-
-        // Show Unified Frontend App
-        .to(
-          ".node-unified",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          1.5,
-        )
-
-        // Show Logic & Connect App to Logic
-        .to(
-          ".node-logic",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          3.0,
-        )
-        .to(
-          staticLinesAppLogicRef.current,
-          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
-          3.5,
-        )
-        .to(flowLinesAppLogicRef.current, { opacity: 1, duration: 0.5 }, 4.5)
-        .to(
-          flowLinesAppLogicRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          4.5,
-        )
-
-        // Show Database & Connect Logic to Database
-        .to(
-          ".node-db",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          5.5,
-        )
-        .to(
-          staticLinesLogicDBRef.current,
-          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
-          6.0,
-        )
-        .to(flowLinesLogicDBRef.current, { opacity: 1, duration: 0.5 }, 7.0)
-        .to(
-          flowLinesLogicDBRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          7.0,
-        )
-
-        // Fly in badges smoothly
-        .to(
-          badges1Ref.current.children,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 1,
-            stagger: 0.2,
-            ease: DS.easing.enter,
-          },
-          8.5,
-        )
-        .to(
-          badges2Ref.current.children,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 1,
-            stagger: 0.2,
-            ease: DS.easing.enter,
-          },
-          10.0,
-        )
-
-        // Clean Outro
-        .addLabel("outro", 18)
-        .to(
-          masterRef.current.getChildren(),
-          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
-          "outro",
-        );
-    });
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
-  }, [frame, fps]);
-
-  return (
-    <ScaledStage>
-      {/* Title */}
-      <div
-        style={{
-          position: "absolute",
-          top: 100,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div ref={titleRef}>
-          <div
-            style={{
-              fontSize: 64,
-              fontWeight: 900,
-              color: DS.colors.textPrimary,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            2. Cross-Platform Approach
-          </div>
-          <div
-            style={{
-              width: 120,
-              height: 6,
-              background: DS.colors.purple,
-              marginTop: 24,
-              borderRadius: 3,
-              margin: "24px auto 0 auto",
-            }}
-          ></div>
-        </div>
-      </div>
-
-      {/* ─── LINES: APP -> LOGIC ─── */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 0,
-        }}
-      >
-        <g
-          ref={staticLinesAppLogicRef}
-          stroke={DS.colors.border}
-          strokeWidth="6"
-          fill="none"
-        >
-          <path d="M 760 520 L 1000 520" /> {/* Unified App to Logic */}
-        </g>
-      </svg>
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 1,
-        }}
-      >
-        <g
-          ref={flowLinesAppLogicRef}
-          stroke={DS.colors.purple}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="16 32"
-          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.purpleGlow})` }}
-        >
-          <path d="M 760 520 L 1000 520" />
-        </g>
-      </svg>
-
-      {/* ─── LINES: LOGIC -> DB ─── */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 0,
-        }}
-      >
-        <g
-          ref={staticLinesLogicDBRef}
-          stroke={DS.colors.border}
-          strokeWidth="6"
-          fill="none"
-        >
-          <path d="M 1200 520 L 1440 520" /> {/* Logic to DB */}
-        </g>
-      </svg>
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 1,
-        }}
-      >
-        <g
-          ref={flowLinesLogicDBRef}
-          stroke={DS.colors.purple}
-          strokeWidth="6"
-          fill="none"
-          strokeDasharray="16 32"
-          style={{ filter: `drop-shadow(0 0 12px ${DS.colors.purpleGlow})` }}
-        >
-          <path d="M 1200 520 L 1440 520" />
-        </g>
-      </svg>
-
-      {/* ─── NODES (Safely wrapped for perfect centering) ─── */}
-      <div
-        style={{
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          zIndex: 10,
-        }}
-      >
-        {/* Unified Frontend Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 520,
-            left: 660,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div className="node-unified">
-            <Box
-              icon={<IconUnifiedUI color={DS.colors.purple} />}
-              label="Web & Mobile"
-              color={DS.colors.purple}
-              glow={DS.colors.purpleGlow}
-            />
-          </div>
-        </div>
-
-        {/* Logic Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 520,
-            left: 1100,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div className="node-logic">
-            <Box
-              icon={<IconLogicFlow color={DS.colors.textSecondary} />}
-              label="Logic"
-              color={DS.colors.border}
-            />
-          </div>
-        </div>
-
-        {/* Database Layer */}
-        <div
-          style={{
-            position: "absolute",
-            top: 520,
-            left: 1540,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div className="node-db">
-            <Box
-              icon={<IconDBStack color={DS.colors.textSecondary} />}
-              label="Database"
-              color={DS.colors.border}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ─── BADGES ─── */}
-      {/* Notice we pass forwardRef DIRECTLY to the component, eliminating the wrapper div */}
-      <div style={{ position: "absolute", top: 320, left: 100 }}>
-        <BadgeList
-          forwardRef={badges1Ref}
-          items={[
-            { label: "Faster Development", color: DS.colors.green },
-            { label: "Good Flexibility", color: DS.colors.green },
-            { label: "Strong Performance", color: DS.colors.green },
-          ]}
-        />
-      </div>
-
-      <div style={{ position: "absolute", top: 620, left: 100 }}>
-        <BadgeList
-          forwardRef={badges2Ref}
-          items={[
-            { label: "Still Needs Coding", color: DS.colors.amber },
-            { label: "Setup & Maintenance", color: DS.colors.amber },
-          ]}
-        />
-      </div>
-    </ScaledStage>
-  );
-};
-
-// ─── SCENE 5: LOW CODE ────────────────────────────────────────────────────
-const Scene5_LowCode = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-
-  const titleRef = useRef(null),
-    panelRef = useRef(null),
-    innerElsRef = useRef(null);
-
-  const orbitGroupRef = useRef(null),
-    flowLinesPagesLogicRef = useRef(null),
-    staticLinesPagesLogicRef = useRef(null),
-    flowLinesLogicStorageRef = useRef(null),
-    staticLinesLogicStorageRef = useRef(null),
-    badgesRef = useRef(null);
-
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
-
-      // 1. Safe GSAP Initialization
-      master.set(titleRef.current, { opacity: 0, y: -20 });
-      master.set(panelRef.current, { opacity: 0, scale: 0.9 });
-
-      master.set(".node-pages, .node-logic, .node-storage", {
-        opacity: 0,
-        scale: 0.8,
-      });
-
-      master.set(staticLinesPagesLogicRef.current, {
-        strokeDasharray: 500,
-        strokeDashoffset: 500,
-      });
-      master.set(flowLinesPagesLogicRef.current, { opacity: 0 });
-
-      master.set(staticLinesLogicStorageRef.current, {
-        strokeDasharray: 500,
-        strokeDashoffset: 500,
-      });
-      master.set(flowLinesLogicStorageRef.current, { opacity: 0 });
-
-      master.set(".orbit-badge", { opacity: 0, scale: 0 });
-
-      // We initialize the badge items explicitly to catch them
-      master.set(badgesRef.current.children, { opacity: 0, x: -40 });
-
-      // 2. Orchestration
-      master
-        .to(
-          titleRef.current,
-          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
-          0.5,
-        )
-        .to(
-          panelRef.current,
-          { opacity: 1, scale: 1, duration: 1.5, ease: DS.easing.smooth },
-          1.5,
-        )
-
-        // Show Pages
-        .to(
-          ".node-pages",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          2.5,
-        )
-
-        // Connect & Show Logic
-        .to(
-          staticLinesPagesLogicRef.current,
-          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
-          3.5,
-        )
-        .to(flowLinesPagesLogicRef.current, { opacity: 1, duration: 0.5 }, 4.0)
-        .to(
-          flowLinesPagesLogicRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          4.0,
-        )
-        .to(
-          ".node-logic",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          4.5,
-        )
-
-        // Connect & Show Storage
-        .to(
-          staticLinesLogicStorageRef.current,
-          { strokeDashoffset: 0, duration: 1.0, ease: DS.easing.smooth },
-          5.5,
-        )
-        .to(
-          flowLinesLogicStorageRef.current,
-          { opacity: 1, duration: 0.5 },
-          6.0,
-        )
-        .to(
-          flowLinesLogicStorageRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          6.0,
-        )
-        .to(
-          ".node-storage",
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          6.5,
-        )
-
-        // Pop in the platform orbit badges
-        .to(
-          ".orbit-badge",
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 1.2,
-            stagger: 0.2,
-            ease: DS.easing.spring,
-          },
-          8.5,
-        )
-
-        // Feature Badges on the left
-        .to(
-          badgesRef.current.children,
-          {
-            opacity: 1,
-            x: 0,
-            duration: 1.0,
-            stagger: 0.2,
-            ease: DS.easing.enter,
-          },
-          10.0,
-        )
-
-        // Clean Outro
-        .addLabel("outro", 18)
-        .to(
-          masterRef.current.getChildren(),
-          { opacity: 0, y: -20, duration: 1.5, ease: DS.easing.exit },
-          "outro",
-        );
-    });
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
-  }, [frame, fps]);
-
-  return (
-    <ScaledStage>
-      {/* Title */}
-      <div
-        style={{
-          position: "absolute",
-          top: 100,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        <div
-          ref={titleRef}
-          style={{ opacity: 0, transform: "translateY(-20px)" }}
-        >
-          <div
-            style={{
-              fontSize: 64,
-              fontWeight: 900,
-              color: DS.colors.textPrimary,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            3. Low-Code Platforms
-          </div>
-          <div
-            style={{
-              width: 120,
-              height: 6,
-              background: DS.colors.green,
-              marginTop: 24,
-              borderRadius: 3,
-              margin: "24px auto 0 auto",
-            }}
-          ></div>
-        </div>
-      </div>
-
-      {/* Main Platform Container (Centered safely) */}
-      <div
-        style={{
-          position: "absolute",
-          top: 520,
-          left: 1100,
-          transform: "translate(-50%, -50%)",
-          zIndex: 10,
-        }}
-      >
-        <div
-          ref={panelRef}
+        {/* PARAGRAPH COMPONENT */}
+        <p
+          className="s1-paragraph"
           style={{
             opacity: 0,
-            transform: "scale(0.9)",
-            width: 1000,
-            height: 440,
-            background: DS.colors.panel,
-            border: `4px solid ${DS.colors.green}`,
-            borderRadius: 64,
-            boxShadow: `0 0 80px ${DS.colors.greenGlow}, inset 0 0 48px ${DS.colors.greenGlow}`,
-            position: "relative",
+            fontSize: 34,
+            color: "#CBD5E1",
+            textAlign: "center",
+            maxWidth: 1380,
+            lineHeight: 1.7,
+            margin: 0,
+            fontWeight: 400,
           }}
         >
-          {/* ─── LINES: PAGES -> LOGIC ─── */}
-          <svg
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              zIndex: 0,
-            }}
-          >
-            <g
-              ref={staticLinesPagesLogicRef}
-              stroke={DS.colors.green}
-              strokeWidth="6"
-              fill="none"
-              opacity="0.4"
-              strokeDasharray="500"
-              strokeDashoffset="500"
-            >
-              <path d="M 290 220 L 410 220" />
-            </g>
-          </svg>
-          <svg
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              zIndex: 1,
-            }}
-          >
-            <g
-              ref={flowLinesPagesLogicRef}
-              stroke={DS.colors.green}
-              strokeWidth="6"
-              fill="none"
-              strokeDasharray="16 32"
-              opacity="0"
-              style={{ filter: `drop-shadow(0 0 12px ${DS.colors.greenGlow})` }}
-            >
-              <path d="M 290 220 L 410 220" />
-            </g>
-          </svg>
+          Mendix is a low-code platform developed by Siemens that lets you to
+          build enterprise-grade applications using simple drag-and-drop tools
+          without heavy coding. It helps business and IT teams work together to
+          build web and mobile apps much faster.
+        </p>
 
-          {/* ─── LINES: LOGIC -> STORAGE ─── */}
-          <svg
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              zIndex: 0,
-            }}
-          >
-            <g
-              ref={staticLinesLogicStorageRef}
-              stroke={DS.colors.green}
-              strokeWidth="6"
-              fill="none"
-              opacity="0.4"
-              strokeDasharray="500"
-              strokeDashoffset="500"
-            >
-              <path d="M 590 220 L 710 220" />
-            </g>
-          </svg>
-          <svg
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              zIndex: 1,
-            }}
-          >
-            <g
-              ref={flowLinesLogicStorageRef}
-              stroke={DS.colors.green}
-              strokeWidth="6"
-              fill="none"
-              strokeDasharray="16 32"
-              opacity="0"
-              style={{ filter: `drop-shadow(0 0 12px ${DS.colors.greenGlow})` }}
-            >
-              <path d="M 590 220 L 710 220" />
-            </g>
-          </svg>
-
-          {/* ─── INNER NODES (Safely wrapped for perfect centering) ─── */}
-          <div
-            ref={innerElsRef}
-            style={{
-              position: "absolute",
-              width: "100%",
-              height: "100%",
-              zIndex: 10,
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 220,
-                left: 200,
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              <div
-                className="node-pages"
-                style={{ opacity: 0, transform: "scale(0.8)" }}
-              >
-                <Box
-                  icon={<IconUnifiedUI color={DS.colors.green} />}
-                  label="Pages"
-                  color={DS.colors.green}
-                  glow={DS.colors.greenGlow}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                position: "absolute",
-                top: 220,
-                left: 500,
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              <div
-                className="node-logic"
-                style={{ opacity: 0, transform: "scale(0.8)" }}
-              >
-                <Box
-                  icon={<IconLogicFlow color={DS.colors.green} />}
-                  label="Logic"
-                  color={DS.colors.green}
-                  glow={DS.colors.greenGlow}
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                position: "absolute",
-                top: 220,
-                left: 800,
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              <div
-                className="node-storage"
-                style={{ opacity: 0, transform: "scale(0.8)" }}
-              >
-                <Box
-                  icon={<IconDBStack color={DS.colors.green} />}
-                  label="Storage"
-                  color={DS.colors.green}
-                  glow={DS.colors.greenGlow}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ─── ORBIT BADGES (Perfectly aligned to borders) ─── */}
-          <div
-            ref={orbitGroupRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              pointerEvents: "none",
-              zIndex: 20,
-            }}
-          >
-            {/* Top Center */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-              }}
-            >
-              <div
-                className="orbit-badge"
-                style={{
-                  opacity: 0,
-                  transform: "scale(0)",
-                  padding: "16px 36px",
-                  background: DS.colors.bg,
-                  border: `4px solid ${DS.colors.border}`,
-                  borderRadius: 9999,
-                  color: DS.colors.textPrimary,
-                  fontSize: 24,
-                  fontWeight: 800,
-                  boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Power Apps
-              </div>
-            </div>
-
-            {/* Bottom Left */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 250,
-                transform: "translate(-50%, 50%)",
-              }}
-            >
-              <div
-                className="orbit-badge"
-                style={{
-                  opacity: 0,
-                  transform: "scale(0)",
-                  padding: "16px 36px",
-                  background: DS.colors.bg,
-                  border: `4px solid ${DS.colors.border}`,
-                  borderRadius: 9999,
-                  color: DS.colors.textPrimary,
-                  fontSize: 24,
-                  fontWeight: 800,
-                  boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                OutSystems
-              </div>
-            </div>
-
-            {/* Bottom Right (Mendix Highlighted) */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 750,
-                transform: "translate(-50%, 50%)",
-              }}
-            >
-              <div
-                className="orbit-badge"
-                style={{
-                  opacity: 0,
-                  transform: "scale(0)",
-                  padding: "16px 36px",
-                  background: DS.colors.bg,
-                  border: `4px solid ${DS.colors.cyan}`,
-                  borderRadius: 9999,
-                  color: DS.colors.cyan,
-                  fontSize: 24,
-                  fontWeight: 800,
-                  boxShadow: `0 0 48px ${DS.colors.cyanGlow}`,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Mendix
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── LEFT SIDEBAR BADGES ─── */}
-      <div style={{ position: "absolute", top: 380, left: 100 }}>
-        {/* Pass forwardRef directly to BadgeList! */}
-        <BadgeList
-          forwardRef={badgesRef}
-          items={[
-            { label: "Fastest Development", color: DS.colors.green },
-            { label: "No/Low Coding", color: DS.colors.green },
-            { label: "Good Performance", color: DS.colors.cyan },
-            {
-              label: "Everything is Handled by Platform",
-              color: DS.colors.green,
-            },
-          ]}
-        />
-      </div>
-    </ScaledStage>
-  );
-};
-// ─── SCENE 6: SARA & MENDIX ───────────────────────────────────────────────
-// ─── SCENE 6: SARA & MENDIX ───────────────────────────────────────────────
-const Scene6_SaraMendix = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const masterRef = useRef(null);
-
-  const saraRef = useRef(null),
-    connectorRef = useRef(null),
-    flowPathRef = useRef(null);
-  const feature1Ref = useRef(null),
-    feature2Ref = useRef(null);
-
-  // Morph refs
-  const platformContainerRef = useRef(null),
-    platformBoxRef = useRef(null);
-  const platformIconsRef = useRef(null),
-    mendixImageRef = useRef(null);
-  const mendixTextRef = useRef(null),
-    nextTextRef = useRef(null);
-
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      const master = gsap.timeline({ paused: true });
-      masterRef.current = master;
-
-      // 1. Safe GSAP Initialization (No inline transforms on animated elements)
-      master.set(saraRef.current, { opacity: 0, x: -100 });
-      master.set(platformContainerRef.current, { opacity: 0, x: 100 });
-      master.set(connectorRef.current, {
-        strokeDasharray: 850,
-        strokeDashoffset: 850,
-      });
-      master.set(flowPathRef.current, { opacity: 0 });
-      master.set(feature1Ref.current, { opacity: 0, scale: 0.8, y: 20 });
-      master.set(feature2Ref.current, { opacity: 0, scale: 0.8, y: -20 });
-      master.set(mendixImageRef.current, { opacity: 0, scale: 0.5 });
-      master.set(mendixTextRef.current, { opacity: 0, y: 30 });
-      master.set(nextTextRef.current, { opacity: 0, y: 20 });
-
-      // 2. Orchestration
-      master
-        .to(
-          saraRef.current,
-          { opacity: 1, x: 0, duration: 1.5, ease: DS.easing.spring },
-          0.5,
-        )
-        .to(
-          platformContainerRef.current,
-          { opacity: 1, x: 0, duration: 1.5, ease: DS.easing.spring },
-          1.5,
-        )
-
-        // Draw connector exactly 850px (edge of Sara to edge of Platform)
-        .to(
-          connectorRef.current,
-          { strokeDashoffset: 0, duration: 1.5, ease: DS.easing.smooth },
-          3,
-        )
-
-        // Flow data
-        .to(flowPathRef.current, { opacity: 1, duration: 0.5 }, 4.5)
-        .to(
-          flowPathRef.current,
-          { strokeDashoffset: -1000, duration: 20, ease: DS.easing.slowFlow },
-          4.5,
-        )
-
-        // Feature cards pop out above and below the line
-        .to(
-          feature1Ref.current,
-          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: DS.easing.spring },
-          5.5,
-        )
-        .to(
-          feature2Ref.current,
-          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: DS.easing.spring },
-          6.5,
-        )
-
-        // ─── THE MORPH TRANSITION ───
-        .addLabel("morph", 11)
-
-        // 1. Fade out left elements
-        .to(
-          [
-            saraRef.current,
-            feature1Ref.current,
-            feature2Ref.current,
-            connectorRef.current,
-            flowPathRef.current,
-          ],
-          { opacity: 0, duration: 1, ease: DS.easing.smooth },
-          "morph",
-        )
-
-        // 2. Glide the container to the exact screen center (-560px from 1520 = 960)
-        .to(
-          platformContainerRef.current,
-          { x: -560, duration: 1.5, ease: DS.easing.smooth },
-          "morph",
-        )
-
-        // 3. Smoothly transform the box into the Mendix logo container
-        .to(
-          platformBoxRef.current,
-          {
-            borderColor: DS.colors.cyan,
-            boxShadow: `0 0 160px ${DS.colors.cyanGlow}, inset 0 0 64px ${DS.colors.cyanGlow}`,
-            borderRadius: 80,
-            backgroundColor: DS.colors.panel,
-            duration: 1.5,
-            ease: DS.easing.smooth,
-          },
-          "morph",
-        )
-
-        // 4. Cross-fade the icons for the actual Mendix image
-        .to(
-          platformIconsRef.current,
-          { opacity: 0, scale: 0.8, duration: 0.8, ease: DS.easing.smooth },
-          "morph",
-        )
-        .to(
-          mendixImageRef.current,
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          "morph+=0.5",
-        )
-
-        // 5. Fade in the bold text below the box
-        .to(
-          mendixTextRef.current,
-          { opacity: 1, y: 0, duration: 1.2, ease: DS.easing.enter },
-          "morph+=1",
-        )
-        .to(
-          nextTextRef.current,
-          { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
-          "morph+=1.5",
-        )
-
-        // Clean outro
-        .addLabel("outro", 18.5)
-        .to(
-          masterRef.current.getChildren(),
-          { opacity: 0, duration: 1.5, ease: DS.easing.exit },
-          "outro",
-        );
-    });
-    return () => ctx.revert();
-  }, []);
-
-  useEffect(() => {
-    if (masterRef.current) masterRef.current.seek(frame / fps);
-  }, [frame, fps]);
-
-  return (
-    <ScaledStage>
-      {/* 1. Static & Flowing Connector Lines (Aligned exactly at y=540) */}
-      <svg
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 1920,
-          height: 1080,
-          zIndex: 0,
-        }}
-      >
-        <path
-          ref={connectorRef}
-          d="M 490 540 L 1340 540"
-          stroke={DS.colors.green}
-          strokeWidth="8"
-          fill="none"
-        />
-        <path
-          ref={flowPathRef}
-          d="M 490 540 L 1340 540"
-          stroke="#FFFFFF"
-          strokeWidth="8"
-          fill="none"
-          strokeDasharray="16 48"
-          style={{ filter: `drop-shadow(0 0 16px #FFFFFF)` }}
-        />
-      </svg>
-
-      {/* 2. SARA NODE (Strict absolute geometry. Center of circle is mathematically locked to 540) */}
-      <div style={{ position: "absolute", top: 540, left: 400, zIndex: 10 }}>
-        <div ref={saraRef}>
-          {/* Sara Circle */}
-          <div
-            style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 180,
-              height: 180,
-              background: DS.colors.card,
-              border: `6px solid ${DS.colors.border}`,
-              borderRadius: "50%",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              boxShadow: `0 12px 32px rgba(0,0,0,0.6)`,
-            }}
-          >
-            <svg
-              width="100"
-              height="100"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke={DS.colors.textPrimary}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
-
-          {/* Sara Label (Positioned safely below the exact center) */}
-          <div
-            style={{
-              position: "absolute",
-              top: 120,
-              transform: "translateX(-50%)",
-              padding: "16px 40px",
-              background: DS.colors.panel,
-              border: `2px solid ${DS.colors.border}`,
-              borderRadius: 9999,
-              color: DS.colors.textPrimary,
-              fontSize: 26,
-              fontWeight: 700,
-              boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Sara / Shop Owner
-          </div>
-        </div>
-      </div>
-
-      {/* 3. FLOATING FEATURES */}
-      <div style={{ position: "absolute", top: 440, left: 915, zIndex: 5 }}>
+        {/* METRICS & LOGOS WRAPPER GRID */}
         <div
-          ref={feature1Ref}
           style={{
-            position: "absolute",
-            transform: "translate(-50%, -50%)",
-            padding: "16px 32px",
-            background: DS.colors.bg,
-            border: `2px solid ${DS.colors.green}`,
-            borderRadius: 16,
-            color: DS.colors.green,
-            fontSize: 28,
-            fontWeight: 800,
-            textTransform: "uppercase",
-            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 24px ${DS.colors.greenGlow}`,
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 36,
           }}
         >
-          Faster Building
-        </div>
-      </div>
+          {/* STATS CARDS ROW */}
+          <div style={{ display: "flex", gap: 40 }}>
+            {stats.map((stat, i) => (
+              <div
+                key={i}
+                className={`s1-card-${i}`}
+                style={{
+                  opacity: 0,
+                  background: "#1E293B",
+                  border: "1px solid #334155",
+                  borderRadius: 24,
+                  padding: "48px 24px",
+                  width: 330,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 28,
+                }}
+              >
+                <div
+                  style={{
+                    background: stat.bg,
+                    borderRadius: "50%",
+                    padding: 26,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <stat.Icon />
+                </div>
+                <h3
+                  style={{
+                    fontSize: 24,
+                    color: "#F8FAFC",
+                    margin: 0,
+                    fontWeight: 600,
+                  }}
+                >
+                  {stat.label}
+                </h3>
+              </div>
+            ))}
+          </div>
 
-      <div style={{ position: "absolute", top: 640, left: 915, zIndex: 5 }}>
-        <div
-          ref={feature2Ref}
-          style={{
-            position: "absolute",
-            transform: "translate(-50%, -50%)",
-            padding: "16px 32px",
-            background: DS.colors.bg,
-            border: `2px solid ${DS.colors.cyan}`,
-            borderRadius: 16,
-            color: DS.colors.cyan,
-            fontSize: 28,
-            fontWeight: 800,
-            textTransform: "uppercase",
-            boxShadow: `0 12px 32px rgba(0,0,0,0.5), 0 0 24px ${DS.colors.cyanGlow}`,
-            whiteSpace: "nowrap",
-          }}
-        >
-          Simpler Setup
-        </div>
-      </div>
-
-      {/* 4. PLATFORM & MENDIX MORPH CONTAINER */}
-      <div style={{ position: "absolute", top: 540, left: 1520, zIndex: 20 }}>
-        <div ref={platformContainerRef}>
-          {/* The Morphing Box (Center strictly locked) */}
+          {/* DYNAMIC COMPANY LOGOS CONTAINER */}
           <div
-            ref={platformBoxRef}
+            className="s1-logos-container"
             style={{
-              position: "absolute",
-              transform: "translate(-50%, -50%)",
-              width: 360,
-              height: 360,
-              background: DS.colors.card,
-              border: `6px solid ${DS.colors.green}`,
-              borderRadius: 64,
+              opacity: 0,
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              boxShadow: `0 24px 80px rgba(0,0,0,0.6), 0 0 64px ${DS.colors.greenGlow}`,
+              gap: 24,
+              background: "rgba(30, 41, 59, 0.6)",
+              border: "1px solid rgba(51, 65, 85, 0.5)",
+              borderRadius: 20,
+              padding: "16px 32px",
+              marginTop: "50px",
+              backdropFilter: "blur(8px)",
             }}
           >
-            {/* Outgoing Icons */}
-            <div
-              ref={platformIconsRef}
+            <span
               style={{
+                color: "#94A3B8",
+                fontSize: 16,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 1.5,
+                marginRight: 8,
+              }}
+            >
+              Trusted By Global Giants:
+            </span>
+
+            {/* Ford Logo Badge */}
+            <div
+              style={{
+                background: "#FFFFFF",
+                padding: "10px 20px",
+                borderRadius: 12,
                 display: "flex",
-                flexDirection: "column",
                 alignItems: "center",
+                height: 80,
               }}
             >
-              <IconUnifiedUI color={DS.colors.green} />
-              <div style={{ display: "flex", gap: 32, marginTop: 40 }}>
-                <IconLogicFlow color={DS.colors.green} />
-                <IconDBStack color={DS.colors.green} />
-              </div>
+              <Img
+                src={staticFile("ford.png")}
+                style={{
+                  maxHeight: "90%",
+                  maxWidth: "90%",
+                  objectFit: "scale-down",
+                }}
+              />
             </div>
 
-            {/* Incoming Mendix Image */}
-            <div ref={mendixImageRef} style={{ position: "absolute" }}>
-              <img
-                src={staticFile("mendix.png")}
-                alt="Mendix Logo"
-                style={{ width: 300, height: 300, objectFit: "contain" }}
+            {/* Toyota Logo Badge */}
+            <div
+              style={{
+                background: "#FFFFFF",
+                padding: "10px 20px",
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                height: 80,
+              }}
+            >
+              <Img
+                src={staticFile("Toyato.png")}
+                style={{
+                  maxHeight: "90%",
+                  maxWidth: "90%",
+                  objectFit: "scale-down",
+                }}
+              />
+            </div>
+
+            {/* Zurich Insurance Logo Badge */}
+            <div
+              style={{
+                background: "#FFFFFF",
+                padding: "10px 20px",
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                height: 80,
+              }}
+            >
+              <Img
+                src={staticFile("z.png")}
+                style={{
+                  maxHeight: "90%",
+                  maxWidth: "90%",
+                  objectFit: "scale-down",
+                }}
               />
             </div>
           </div>
-
-          {/* Morphing text below box (220px below center places it 40px below the box edge) */}
-          <div
-            ref={mendixTextRef}
-            style={{
-              position: "absolute",
-              top: 220,
-              transform: "translateX(-50%)",
-              fontSize: 80,
-              fontWeight: 900,
-              color: DS.colors.textPrimary,
-              letterSpacing: "-0.02em",
-              textShadow: `0 0 24px ${DS.colors.cyanGlow}`,
-            }}
-          >
-            MENDIX
-          </div>
         </div>
       </div>
-
-      {/* 5. NEXT CAPTION */}
-      <div style={{ position: "absolute", bottom: 120, left: 960, zIndex: 20 }}>
-        <div
-          ref={nextTextRef}
-          style={{
-            position: "absolute",
-            transform: "translate(-50%, 0)",
-            fontSize: 40,
-            fontWeight: 700,
-            color: DS.colors.textSecondary,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Next: Discover Mendix
-        </div>
-      </div>
-    </ScaledStage>
+    </Stage>
   );
 };
-// ─── MAIN ORCHESTRATOR ────────────────────────────────────────────────────
-export default function MainScene() {
-  return (
-    <AbsoluteFill style={{ backgroundColor: DS.colors.bg }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
-        * { box-sizing: border-box; }
-      `}</style>
+// ── SCENE 2: CAPABILITIES ───────────────────────────────────
+const Scene2_Capabilities = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const ref = useRef(null);
+  const master = useRef(null);
 
-      <Sequence from={0} durationInFrames={360}>
-        <Scene1_WelcomeBack />
+  useLayoutEffect(() => {
+    let ctx = gsap.context(() => {
+      const tl = gsap.timeline({ paused: true });
+
+      tl.fromTo(
+        ".s2-title",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        0,
+      )
+        .fromTo(
+          ".s2-card",
+          { opacity: 0, scale: 0.8, y: 40 },
+          {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            duration: 0.8,
+            stagger: 0.2, // This handles the one-after-another animation
+            ease: "back.out(1.2)",
+          },
+          0.5, // Starts slightly after title animation begins
+        )
+        .to(
+          [".s2-card", ".s2-title"],
+          {
+            opacity: 0,
+            y: -20,
+            duration: 0.5,
+            stagger: 0.05,
+            ease: "power2.in",
+          },
+          10.5,
+        );
+      master.current = tl;
+    }, ref);
+    return () => ctx.revert();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (master.current) master.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  const cards = [
+    { title: "10× Faster Speed", Icon: IconLightning, color: DS.colors.amber },
+    {
+      title: "Start Simple, Scale Up",
+      Icon: IconStairs,
+      color: DS.colors.green,
+    },
+    { title: "Drag & Drop (0 Code)", Icon: IconHand, color: DS.colors.purple },
+    {
+      title: "Web + Mobile Ready",
+      Icon: IconDevicesCyan,
+      color: DS.colors.cyan,
+    },
+    { title: "Zero Complex Setup", Icon: IconGear, color: DS.colors.rose },
+    {
+      title: "Extend with Custom Code",
+      Icon: IconCode,
+      color: DS.colors.mendix,
+    },
+  ];
+
+  return (
+    <Stage>
+      <div ref={ref} style={{ width: "100%", height: "100%" }}>
+        <h2
+          className="s2-title"
+          style={{
+            opacity: 0,
+            position: "absolute",
+            top: 120,
+            width: "100%",
+            textAlign: "center",
+            fontSize: 64,
+            fontWeight: 800,
+            color: DS.colors.textPrimary,
+          }}
+        >
+          Why build with Mendix?
+        </h2>
+        <div
+          style={{
+            position: "absolute",
+            top: 320,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "40px",
+            width: 1600,
+          }}
+        >
+          {cards.map((c, i) => (
+            <Card
+              key={i}
+              className="s2-card"
+              style={{
+                position: "relative", // FIX: Overrides the absolute positioning from the base Card component
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "40px 24px",
+              }}
+            >
+              <div
+                style={{
+                  background: DS.colors.cardElevated,
+                  padding: 24,
+                  borderRadius: "50%",
+                  border: `1px solid ${c.color.base}`,
+                  marginBottom: 24,
+                }}
+              >
+                <c.Icon />
+              </div>
+              <h3
+                style={{
+                  margin: 0,
+                  color: DS.colors.textPrimary,
+                  fontSize: 22,
+                  fontWeight: 600,
+                  textAlign: "center",
+                }}
+              >
+                {c.title}
+              </h3>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </Stage>
+  );
+};
+// ── SCENE 3: COURSE SCOPE ───────────────────────────────────
+// ── SCENE 3: COURSE SCOPE ───────────────────────────────────
+const Scene3_CourseScope = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const ref = useRef(null);
+  const master = useRef(null);
+
+  useLayoutEffect(() => {
+    let ctx = gsap.context(() => {
+      const tl = gsap.timeline({ paused: true });
+
+      // 1. Header falls into place smoothly
+      tl.fromTo(
+        ".s3-head",
+        { opacity: 0, y: 40 },
+        { opacity: 1, y: 0, duration: 1.2, ease: "power4.out" },
+        0.2,
+      )
+        // 2. Left Card scales and slides up
+        .fromTo(
+          ".s3-box-l",
+          { opacity: 0, y: 50, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power4.out" },
+          0.6,
+        )
+        // 3. Left Badge pops up with a clean bounce
+        .fromTo(
+          ".s3-badge-l",
+          { opacity: 0, scale: 0.5, y: 15 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" },
+          1.0,
+        )
+        // 4. Line draws perfectly from left to right *after* the left card is ready
+        .fromTo(
+          ".s3-line-path",
+          { strokeDashoffset: 580, strokeDasharray: 580 },
+          { strokeDashoffset: 0, duration: 1.4, ease: "power3.inOut" },
+          1.3,
+        )
+        // 5. Right Card appears exactly as the connecting line reaches it
+        .fromTo(
+          ".s3-box-r",
+          { opacity: 0, y: 50, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 1, ease: "power4.out" },
+          2.1,
+        )
+        // 6. Right Badge pops up cleanly
+        .fromTo(
+          ".s3-badge-r",
+          { opacity: 0, scale: 0.5, y: 15 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" },
+          2.5,
+        )
+        // 7. Footer text reveals gracefully at the bottom
+        .fromTo(
+          ".s3-cap",
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" },
+          2.9,
+        )
+        // 8. Elegant exit animation
+        .to(
+          ".s3-all",
+          {
+            opacity: 0,
+            y: -40,
+            duration: 0.6,
+            stagger: 0.04,
+            ease: "expo.in",
+          },
+          8.5,
+        );
+
+      master.current = tl;
+    }, ref);
+    return () => ctx.revert();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (master.current) master.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  return (
+    <Stage>
+      <div ref={ref} style={{ width: "100%", height: "100%" }}>
+        {/* HEADER SECTION */}
+        <div
+          className="s3-head s3-all"
+          style={{
+            opacity: 0,
+            position: "absolute",
+            top: 140,
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <Badge
+            label="Important Note"
+            color={DS.colors.amber}
+            style={{
+              position: "relative",
+              marginBottom: 28,
+              padding: "10px 24px",
+            }}
+          />
+          <h2
+            style={{
+              fontSize: 64,
+              color: DS.colors.textPrimary,
+              margin: 0,
+              fontWeight: 800,
+              letterSpacing: -0.5,
+            }}
+          >
+            Course Scope: Web Version
+          </h2>
+        </div>
+
+        {/* DIAGRAM SECTION */}
+        <div
+          className="s3-all"
+          style={{
+            position: "absolute",
+            top: "56%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 1100,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {/* CONNECTING LINE */}
+          <svg
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: 260,
+              width: 580,
+              height: 10,
+              transform: "translateY(-50%)",
+              overflow: "visible",
+            }}
+          >
+            <path
+              className="s3-line-path"
+              d="M 0 5 L 580 5"
+              fill="none"
+              stroke={DS.colors.borderBright}
+              strokeWidth="4"
+              strokeDasharray="12 12"
+            />
+          </svg>
+
+          {/* LEFT NODE: WEB APPLICATION */}
+          <div
+            className="s3-box-l"
+            style={{
+              opacity: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              zIndex: 2,
+            }}
+          >
+            <div
+              style={{
+                width: 260,
+                height: 260,
+                background: DS.colors.cardBase,
+                border: `2px solid ${DS.colors.cyan.base}`,
+                borderRadius: 32,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                position: "relative",
+                boxShadow: `0 12px 60px ${DS.colors.cyan.glow}`,
+              }}
+            >
+              <IconLaptop />
+
+              {/* Floating Badge with clear vertical gap */}
+              <div
+                className="s3-badge-l"
+                style={{
+                  position: "absolute",
+                  top: -60,
+                  background: DS.colors.cyan.base,
+                  color: DS.colors.bg,
+                  padding: "10px 26px",
+                  borderRadius: 999,
+                  fontWeight: 800,
+                  fontSize: 15,
+                  textTransform: "uppercase",
+                  letterSpacing: 1.2,
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                }}
+              >
+                We Are Building This
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 28,
+                fontSize: 32,
+                fontWeight: 700,
+                color: DS.colors.textPrimary,
+              }}
+            >
+              Web Application
+            </div>
+          </div>
+
+          {/* RIGHT NODE: MOBILE BROWSER */}
+          <div
+            className="s3-box-r"
+            style={{
+              opacity: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              zIndex: 2,
+            }}
+          >
+            <div
+              style={{
+                width: 260,
+                height: 260,
+                background: DS.colors.cardBase,
+                border: `2px solid ${DS.colors.borderBright}`,
+                borderRadius: 32,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                position: "relative",
+                boxShadow: "0 12px 40px rgba(0, 0, 0, 0.2)",
+              }}
+            >
+              <IconPhone />
+
+              {/* Floating Badge with clear vertical gap */}
+              <div
+                className="s3-badge-r"
+                style={{
+                  position: "absolute",
+                  top: -60,
+                  background: DS.colors.cardElevated,
+                  border: `1px solid ${DS.colors.borderBright}`,
+                  color: DS.colors.textPrimary,
+                  padding: "10px 26px",
+                  borderRadius: 999,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.4)",
+                }}
+              >
+                Still Accessible Here
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 28,
+                fontSize: 32,
+                fontWeight: 700,
+                color: DS.colors.textSecondary,
+              }}
+            >
+              Mobile Browser
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER TIMELINE */}
+        <div
+          className="s3-cap s3-all"
+          style={{
+            opacity: 0,
+            position: "absolute",
+            bottom: 120,
+            width: "100%",
+            textAlign: "center",
+            fontSize: 36,
+            fontWeight: 500,
+            color: DS.colors.textSecondary,
+            letterSpacing: -0.2,
+          }}
+        >
+          Build once. Access everywhere.
+        </div>
+      </div>
+    </Stage>
+  );
+};
+// ── SCENE 4: WHAT'S NEXT ────────────────────────────────────
+const Scene4_WhatsNext = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const ref = useRef(null);
+  const master = useRef(null);
+
+  useLayoutEffect(() => {
+    let ctx = gsap.context(() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(
+        ".s4-head",
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 1, ease: "expo.out" },
+        0.2,
+      )
+        .fromTo(".s4-svg", { opacity: 0 }, { opacity: 1, duration: 0.1 }, 0.6)
+        .fromTo(
+          ".s4-path",
+          { strokeDashoffset: 800, strokeDasharray: 800 },
+          { strokeDashoffset: 0, duration: 1.6, ease: "power2.inOut" },
+          0.6,
+        )
+        .fromTo(
+          ".s4-n1",
+          { opacity: 0, scale: 0.6 },
+          { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.5)" },
+          0.8,
+        )
+        .fromTo(
+          ".s4-n2",
+          { opacity: 0, scale: 0.6 },
+          { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.5)" },
+          2.0,
+        )
+        .to(
+          ".s4-all",
+          {
+            opacity: 0,
+            y: -30,
+            duration: 0.5,
+            stagger: 0.04,
+            ease: "power2.in",
+          },
+          6.5,
+        );
+      master.current = tl;
+    }, ref);
+    return () => ctx.revert();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (master.current) master.current.seek(frame / fps);
+  }, [frame, fps]);
+
+  const nodes = [
+    {
+      cls: "s4-n1",
+      label: "Idea",
+      Icon: IconLightbulb,
+      x: 560,
+      color: DS.colors.amber,
+    },
+    {
+      cls: "s4-n2",
+      label: "Final App",
+      Icon: IconRocket,
+      x: 1360,
+      color: DS.colors.cyan,
+    },
+  ];
+
+  return (
+    <Stage>
+      <div ref={ref} style={{ width: "100%", height: "100%" }}>
+        <div
+          className="s4-head s4-all"
+          style={{
+            opacity: 0,
+            position: "absolute",
+            top: 220,
+            width: "100%",
+            textAlign: "center",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 72,
+              color: DS.colors.textPrimary,
+              margin: 0,
+              fontWeight: 800,
+            }}
+          >
+            Next Video: App Lifecycle
+          </h2>
+          <p
+            style={{
+              fontSize: 32,
+              color: DS.colors.textSecondary,
+              marginTop: 24,
+              margin: 0,
+            }}
+          ></p>
+        </div>
+
+        {/* SVG line remains at Y=500 exactly */}
+        <svg
+          className="s4-svg s4-all"
+          style={{
+            opacity: 0,
+            position: "absolute",
+            top: 500,
+            left: 560,
+            width: 800,
+            height: 10,
+            transform: "translateY(-50%)",
+            overflow: "visible",
+          }}
+        >
+          <path
+            className="s4-path"
+            d="M0 5 L800 5"
+            fill="none"
+            stroke={DS.colors.cyan.bright}
+            strokeWidth="6"
+          />
+        </svg>
+
+        {nodes.map((n, i) => (
+          // FIX: Decoupled the Badge from the flex column. The geometric center of this node is now exactly the 160x160 circle.
+          <div
+            key={i}
+            className={`${n.cls} s4-all`}
+            style={{
+              opacity: 0,
+              position: "absolute",
+              left: n.x,
+              top: 500,
+              transform: "translate(-50%, -50%)",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                background: DS.colors.cardBase,
+                border: `2px solid ${n.color.base}`,
+                borderRadius: "50%",
+                width: 160,
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <n.Icon />
+            </div>
+            <Badge
+              label={n.label}
+              color={n.color}
+              style={{
+                position: "absolute",
+                top: "100%",
+                marginTop: 32,
+                fontSize: 24,
+                padding: "12px 32px",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </Stage>
+  );
+};
+
+// ── MAIN COMPONENT (SEAMLESS MATH) ──────────────────────────
+const MainScene = () => {
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#0B0F19" }}>
+      {/* 4 Seconds */}
+      <Sequence from={0} durationInFrames={240}>
+        <Scene0_WelcomeBack />
       </Sequence>
-      <Sequence from={360} durationInFrames={300}>
-        <Scene2_HighLevel />
+      {/* FIX: 13 Seconds (Reduced from 20s to fit the new tighter timeline) */}
+      <Sequence from={240} durationInFrames={780}>
+        <Scene1_WhatIsMendix />
       </Sequence>
-      <Sequence from={660} durationInFrames={1170}>
-        <Scene3_Traditional />
+      {/* 12 Seconds */}
+      <Sequence from={1020} durationInFrames={720}>
+        <Scene2_Capabilities />
       </Sequence>
-      <Sequence from={1830} durationInFrames={1170}>
-        <Scene4_CrossPlatform />
+      {/* 10 Seconds */}
+      <Sequence from={1740} durationInFrames={600}>
+        <Scene3_CourseScope />
       </Sequence>
-      <Sequence from={3000} durationInFrames={1170}>
-        <Scene5_LowCode />
-      </Sequence>
-      <Sequence from={4170} durationInFrames={1200}>
-        <Scene6_SaraMendix />
+      {/* 8 Seconds */}
+      <Sequence from={2340} durationInFrames={480}>
+        <Scene4_WhatsNext />
       </Sequence>
     </AbsoluteFill>
   );
-}
+};
+
+export default MainScene;
