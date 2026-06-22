@@ -635,7 +635,7 @@ const Scene1_WhatIsMendix = () => {
               }}
             >
               <Img
-                src={staticFile("ford.png")}
+                src={staticFile("Ford.png")}
                 style={{
                   maxHeight: "90%",
                   maxWidth: "90%",
