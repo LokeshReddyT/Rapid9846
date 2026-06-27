@@ -4,7 +4,9 @@ import {
   registerRoot,
   Composition,
   useVideoConfig,
+  useCurrentFrame,
   staticFile,
+  Sequence,
 } from "remotion";
 
 // ── 1. DESIGN TOKENS ────────────────────────────────────────
@@ -35,17 +37,13 @@ const DS = {
 };
 
 const CENTER = { x: 960, y: 540 };
-
-// Safe radius so nodes don't overlap headers/footers
 const RADIUS = 280;
 
-// Generate coordinates for a perfectly spaced 9-point circle
 const getPos = (angleDeg) => ({
   x: CENTER.x + RADIUS * Math.cos((angleDeg * Math.PI) / 180),
   y: CENTER.y + RADIUS * Math.sin((angleDeg * Math.PI) / 180),
 });
 
-// Sequenced perfectly in a clockwise sweep starting from the Left
 const SATELLITES = [
   {
     id: "portal",
@@ -373,6 +371,7 @@ const SATELLITES = [
 // ── 2. COMPONENTS ───────────────────────────────────────────
 
 const ConnectorLine = React.forwardRef(({ x1, y1, x2, y2, color }, ref) => {
+  const frame = useCurrentFrame();
   const len = Math.hypot(x2 - x1, y2 - y1);
   const ang = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
 
@@ -396,10 +395,12 @@ const ConnectorLine = React.forwardRef(({ x1, y1, x2, y2, color }, ref) => {
           height: "100%",
           background: `repeating-linear-gradient(90deg, ${color}, ${color} 6px, transparent 6px, transparent 12px)`,
           backgroundSize: "200% 100%",
+          // Slowed down 4x for a much smoother drift
+          backgroundPositionX: -(frame * 0.5),
           transformOrigin: "0 50%",
           transform: "scaleX(0)",
           opacity: 0,
-          willChange: "transform, opacity, background-position",
+          willChange: "transform, opacity",
         }}
       />
     </div>
@@ -459,7 +460,6 @@ const NodeCard = React.forwardRef(
         >
           {icon}
         </div>
-
         <div
           style={{
             display: "flex",
@@ -510,11 +510,14 @@ const NodeCard = React.forwardRef(
 
 // ── 3. SCENE: ECOSYSTEM ─────────────────────────────────────
 const EcosystemScene = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const tlRef = useRef(null);
+
   const headerRef = useRef(null);
   const captionRef = useRef(null);
   const captionTextRef = useRef(null);
   const ringRef = useRef(null);
-  const idleRefs = useRef([]);
 
   const nodes = {
     hub: useRef(null),
@@ -526,204 +529,158 @@ const EcosystemScene = () => {
   const lines = useRef([]);
   const dots = useRef([]);
 
-  const updateCaption = (text) => {
-    if (!captionTextRef.current || !captionRef.current) return;
-    gsap.to(captionRef.current, {
-      opacity: 0,
-      y: 15,
-      duration: 0.2,
-      ease: DS.easing.exit,
-      onComplete: () => {
-        captionTextRef.current.innerText = text;
-        gsap.to(captionRef.current, {
-          opacity: 1,
-          y: 0,
-          duration: 0.4,
-          ease: DS.easing.back,
-        });
-      },
-    });
-  };
-
   useEffect(() => {
-    let tl;
-    document.fonts.ready.then(() => {
-      // 1. Init states
-      gsap.set(headerRef.current, { opacity: 0, y: -20 });
-      gsap.set(captionRef.current, { opacity: 0, y: 20 });
-      gsap.set(ringRef.current, { scale: 0, opacity: 0 });
-      gsap.set(dots.current, { opacity: 0, scale: 0 });
+    const tl = gsap.timeline({ paused: true });
 
-      tl = gsap.timeline();
+    gsap.set(headerRef.current, { opacity: 0, y: -20 });
+    gsap.set(captionRef.current, { opacity: 0, y: 20 });
+    gsap.set(ringRef.current, { scale: 0, opacity: 0 });
+    gsap.set(dots.current, { opacity: 0, scale: 0 });
 
-      // 2. Intro Hub & Header
-      tl.addLabel("hub", "+=0.5")
-        .to(
-          nodes.hub.current,
-          { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.spring },
-          "hub",
-        )
-        .to(
-          headerRef.current,
-          { opacity: 1, y: 0, duration: 1.0, ease: DS.easing.enter },
-          "hub+=0.3",
-        )
-        .add(
-          () => updateCaption("Exploring the wider Mendix ecosystem."),
-          "hub+=0.3",
-        );
-
-      // 3. Stagger through satellites
-      SATELLITES.forEach((sat, idx) => {
-        const beatOffset = idx === 0 ? "+=1.0" : "+=2.5";
-
-        tl.addLabel(`sat_${idx}`, beatOffset)
-          .add(() => updateCaption(sat.caption), `sat_${idx}`)
-          // Node Pop
-          .to(
-            nodes.satsOuter.current[idx],
-            { opacity: 1, scale: 1, duration: 0.8, ease: DS.easing.back },
-            `sat_${idx}`,
-          )
-          // Connector Line Draw
-          .to(
-            lines.current[idx],
-            { scaleX: 1, opacity: 0.7, duration: 0.8, ease: DS.easing.smooth },
-            `sat_${idx}`,
-          )
-          // Infinite moving dash starting immediately after draw
-          .add(() => {
-            gsap.to(lines.current[idx], {
-              backgroundPositionX: "-24px",
-              ease: "none",
-              duration: 1.2,
-              repeat: -1,
-            });
-          }, `sat_${idx}+=0.8`);
-      });
-
-      // 4. Grand Finale Pulse
-      const finaleTargets = SATELLITES.map((s) => ({ x: s.x, y: s.y }));
-
-      tl.addLabel("finale", "+=3.5")
-        .add(
-          () =>
-            updateCaption("All of these together form the Mendix Ecosystem."),
-          "finale",
-        )
-        .to(
-          ringRef.current,
-          { opacity: 1, scale: 4.5, duration: 1.0, ease: "power2.out" },
-          "finale",
-        )
-        .to(ringRef.current, { opacity: 0, duration: 0.4 }, "finale+=0.6")
-        .to(dots.current, { opacity: 1, scale: 1, duration: 0.05 }, "finale")
-        .to(
-          dots.current,
-          {
-            x: (i) => finaleTargets[i].x,
-            y: (i) => finaleTargets[i].y,
-            duration: 1.0,
-            ease: "expo.out",
-          },
-          "finale",
-        )
-        .to(
-          dots.current,
-          { opacity: 0, scale: 0, duration: 0.3 },
-          "finale+=0.8",
-        )
-        .add(() => launchIdles(), "finale+=0.2");
-
-      // 5. The Closing Loop (Suck-in and Expand)
-      tl.addLabel("collapse", "finale+=3.5")
-        // Hide Header & Caption
-        .to(
-          headerRef.current,
-          { opacity: 0, y: -30, duration: 0.8, ease: DS.easing.exit },
-          "collapse",
-        )
+    const animateCaption = (text, timeLabel) => {
+      tl.to(
+        captionRef.current,
+        { opacity: 0, y: 15, duration: 0.3, ease: DS.easing.exit },
+        timeLabel,
+      )
+        .set(captionTextRef.current, { innerText: text }, `${timeLabel}+=0.3`)
         .to(
           captionRef.current,
-          { opacity: 0, y: 30, duration: 0.8, ease: DS.easing.exit },
-          "collapse",
-        )
-        // Retract Lines
-        .to(
-          lines.current,
-          {
-            scaleX: 0,
-            opacity: 0,
-            duration: 0.6,
-            ease: DS.easing.exit,
-            stagger: 0.05,
-          },
-          "collapse",
-        )
-        // Suck satellites into the center
-        .to(
-          nodes.satsOuter.current,
-          {
-            x: CENTER.x,
-            y: CENTER.y,
-            scale: 0,
-            opacity: 0,
-            duration: 1.2,
-            ease: "back.in(1.2)",
-            stagger: 0.05,
-          },
-          "collapse+=0.2",
-        )
-        // Expand the main hub gloriously
-        .to(
-          nodes.hub.current,
-          {
-            scale: 1.9,
-            duration: 1.5,
-            ease: DS.easing.smooth,
-          },
-          "collapse+=0.8",
-        )
-        // Final bright glow on the expanded hub
-        .to(
-          nodes.hubInner.current,
-          {
-            boxShadow: `0 0 100px ${DS.colors.cyan}, 0 0 30px #FFF`,
-            borderColor: "#FFF",
-            duration: 1.2,
-            ease: "sine.inOut",
-          },
-          "collapse+=1.0",
-        )
-        .addLabel("end", "+=2.0"); // Final hold frame buffer
+          { opacity: 1, y: 0, duration: 0.6, ease: DS.easing.back },
+          `${timeLabel}+=0.3`,
+        );
+    };
+
+    // Slower Initial Hub Entrance
+    tl.addLabel("hub", 0.5)
+      .to(
+        nodes.hub.current,
+        { opacity: 1, scale: 1, duration: 1.8, ease: DS.easing.spring },
+        "hub",
+      )
+      .to(
+        headerRef.current,
+        { opacity: 1, y: 0, duration: 1.5, ease: DS.easing.enter },
+        "hub+=0.5",
+      );
+
+    animateCaption("Exploring the wider Mendix ecosystem.", "hub+=0.5");
+
+    let currentPlayhead = 2.5;
+
+    // Slower Satellite Pop-ins
+    SATELLITES.forEach((sat, idx) => {
+      // Allow 1.5 seconds between each node instead of 2.5 for a steady, relaxed rhythm
+      currentPlayhead += idx === 0 ? 1.0 : 1.5;
+      tl.addLabel(`sat_${idx}`, currentPlayhead);
+
+      animateCaption(sat.caption, `sat_${idx}`);
+
+      tl.to(
+        nodes.satsOuter.current[idx],
+        { opacity: 1, scale: 1, duration: 1.2, ease: DS.easing.back },
+        `sat_${idx}`,
+      ).to(
+        lines.current[idx],
+        { scaleX: 1, opacity: 0.7, duration: 1.5, ease: DS.easing.smooth },
+        `sat_${idx}`,
+      );
     });
 
-    // Idle Animations
-    const launchIdles = () => {
-      const allInner = [nodes.hubInner.current, ...nodes.satsInner.current];
-      allInner.forEach((el, i) => {
-        if (!el) return;
-        idleRefs.current.push(
-          gsap.to(el, {
-            y: -8,
-            duration: 2.5 + i * 0.15,
-            ease: DS.easing.float,
-            yoyo: true,
-            repeat: -1,
-          }),
-        );
-      });
-    };
+    const finaleTime = currentPlayhead + 4.0;
+    const finaleTargets = SATELLITES.map((s) => ({ x: s.x, y: s.y }));
 
-    return () => {
-      if (tl) tl.kill();
-      idleRefs.current.forEach((t) => t.kill());
-    };
+    tl.addLabel("finale", finaleTime);
+    animateCaption(
+      "All of these together form the Mendix Ecosystem.",
+      "finale",
+    );
+
+    // Slower Grand Finale Effects
+    tl.to(
+      ringRef.current,
+      { opacity: 1, scale: 4.5, duration: 1.5, ease: "power2.out" },
+      "finale",
+    )
+      .to(ringRef.current, { opacity: 0, duration: 0.6 }, "finale+=0.8")
+      .to(dots.current, { opacity: 1, scale: 1, duration: 0.1 }, "finale")
+      .to(
+        dots.current,
+        {
+          x: (i) => finaleTargets[i].x,
+          y: (i) => finaleTargets[i].y,
+          duration: 1.5,
+          ease: "expo.out",
+        },
+        "finale",
+      )
+      .to(dots.current, { opacity: 0, scale: 0, duration: 0.5 }, "finale+=1.2");
+
+    const collapseTime = finaleTime + 4.5;
+    tl.addLabel("collapse", collapseTime)
+      .to(
+        headerRef.current,
+        { opacity: 0, y: -30, duration: 1.2, ease: DS.easing.exit },
+        "collapse",
+      )
+      .to(
+        captionRef.current,
+        { opacity: 0, y: 30, duration: 1.2, ease: DS.easing.exit },
+        "collapse",
+      )
+      .to(
+        lines.current,
+        {
+          scaleX: 0,
+          opacity: 0,
+          duration: 1.0,
+          ease: DS.easing.exit,
+          stagger: 0.08,
+        },
+        "collapse",
+      )
+      .to(
+        nodes.satsOuter.current,
+        {
+          x: CENTER.x,
+          y: CENTER.y,
+          scale: 0,
+          opacity: 0,
+          duration: 1.5,
+          ease: "back.in(1.2)",
+          stagger: 0.08,
+        },
+        "collapse+=0.3",
+      )
+      .to(
+        nodes.hub.current,
+        { scale: 1.9, duration: 2.0, ease: DS.easing.smooth },
+        "collapse+=1.0",
+      )
+      .to(
+        nodes.hubInner.current,
+        {
+          boxShadow: `0 0 100px ${DS.colors.cyan}, 0 0 30px #FFF`,
+          borderColor: "#FFF",
+          duration: 1.8,
+          ease: "sine.inOut",
+        },
+        "collapse+=1.2",
+      )
+      .addLabel("end", "+=2.0");
+
+    tlRef.current = tl;
+    return () => tl.kill();
   }, []);
+
+  useEffect(() => {
+    if (tlRef.current) {
+      tlRef.current.time(frame / fps);
+    }
+  }, [frame, fps]);
 
   return (
     <div style={{ position: "absolute", width: 1920, height: 1080 }}>
-      {/* Fixed Header */}
       <div
         ref={headerRef}
         style={{
@@ -732,7 +689,6 @@ const EcosystemScene = () => {
           width: "100%",
           textAlign: "center",
           zIndex: 40,
-          willChange: "transform, opacity",
         }}
       >
         <h2
@@ -743,7 +699,6 @@ const EcosystemScene = () => {
             color: DS.colors.textPrimary,
             letterSpacing: "-0.02em",
             textTransform: "uppercase",
-            textShadow: "0 8px 32px rgba(0,0,0,0.8)",
           }}
         >
           The Mendix Ecosystem
@@ -767,7 +722,6 @@ const EcosystemScene = () => {
           transformOrigin: "960px 540px",
         }}
       >
-        {/* Connector Lines */}
         {SATELLITES.map((sat, i) => (
           <ConnectorLine
             key={`line-${sat.id}`}
@@ -780,7 +734,6 @@ const EcosystemScene = () => {
           />
         ))}
 
-        {/* Pulse Particles */}
         {SATELLITES.map((_, i) => (
           <div
             key={`dot-${i}`}
@@ -800,7 +753,6 @@ const EcosystemScene = () => {
           />
         ))}
 
-        {/* Central Pulse Ring */}
         <div
           ref={ringRef}
           style={{
@@ -811,12 +763,10 @@ const EcosystemScene = () => {
             height: 100,
             borderRadius: "50%",
             border: `3px solid ${DS.colors.cyan}`,
-            boxShadow: `0 0 40px ${DS.colors.cyan}`,
             zIndex: 12,
           }}
         />
 
-        {/* Central Hub Node */}
         <NodeCard
           ref={nodes.hub}
           innerRef={nodes.hubInner}
@@ -834,7 +784,6 @@ const EcosystemScene = () => {
           }
         />
 
-        {/* Orbiting Satellite Nodes */}
         {SATELLITES.map((sat, i) => (
           <NodeCard
             key={sat.id}
@@ -850,7 +799,6 @@ const EcosystemScene = () => {
         ))}
       </div>
 
-      {/* Enhanced Cinematic Caption Area */}
       <div
         style={{
           position: "absolute",
@@ -867,12 +815,9 @@ const EcosystemScene = () => {
             background: "rgba(15, 23, 42, 0.85)",
             backdropFilter: "blur(20px)",
             border: `1px solid ${DS.colors.border}`,
-            borderLeft: `4px solid ${DS.colors.cyan}`, // Slick Accent Bar
+            borderLeft: `4px solid ${DS.colors.cyan}`,
             padding: "16px 44px",
-            borderRadius: 12, // Rounded rectangle instead of pill for a pro look
-            boxShadow:
-              "0 12px 48px rgba(0,0,0,0.8), 0 0 20px rgba(56,189,248,0.1)",
-            willChange: "transform, opacity",
+            borderRadius: 12,
           }}
         >
           <span
@@ -881,12 +826,8 @@ const EcosystemScene = () => {
               fontSize: 26,
               fontWeight: 600,
               color: DS.colors.textPrimary,
-              letterSpacing: "-0.01em",
-              textShadow: "0 2px 12px rgba(0,0,0,0.8)",
             }}
-          >
-            {/* dynamic text injected here */}
-          </span>
+          />
         </div>
       </div>
     </div>
@@ -912,10 +853,7 @@ const Stage = ({ children }) => {
         justifyContent: "center",
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400&display=swap');
-        * { box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
-      `}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400&display=swap'); * { box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }`}</style>
       <div
         style={{
           width: 1920,
@@ -931,11 +869,15 @@ const Stage = ({ children }) => {
   );
 };
 
-// ── 5. MAIN SCENE CONTROLLER ────────────────────────────────
-export default function MainScene() {
+const MainScene = () => {
+  const { durationInFrames } = useVideoConfig();
   return (
     <Stage>
-      <EcosystemScene />
+      <Sequence from={0} durationInFrames={durationInFrames}>
+        <EcosystemScene />
+      </Sequence>
     </Stage>
   );
-}
+};
+
+export default MainScene;
