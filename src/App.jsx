@@ -395,9 +395,8 @@ const ConnectorLine = React.forwardRef(({ x1, y1, x2, y2, color }, ref) => {
           height: "100%",
           background: `repeating-linear-gradient(90deg, ${color}, ${color} 6px, transparent 6px, transparent 12px)`,
           backgroundSize: "200% 100%",
-          // Slowed down 4x for a much smoother drift
           backgroundPositionX: -(frame * 0.5),
-          transformOrigin: "0 50%",
+          transformOrigin: "100% 50%",
           transform: "scaleX(0)",
           opacity: 0,
           willChange: "transform, opacity",
@@ -551,7 +550,6 @@ const EcosystemScene = () => {
         );
     };
 
-    // Slower Initial Hub Entrance
     tl.addLabel("hub", 0.5)
       .to(
         nodes.hub.current,
@@ -568,10 +566,9 @@ const EcosystemScene = () => {
 
     let currentPlayhead = 2.5;
 
-    // Slower Satellite Pop-ins
+    // 3 Second gaps applied here
     SATELLITES.forEach((sat, idx) => {
-      // Allow 1.5 seconds between each node instead of 2.5 for a steady, relaxed rhythm
-      currentPlayhead += idx === 0 ? 1.0 : 1.5;
+      currentPlayhead += idx === 0 ? 1.0 : 8.0;
       tl.addLabel(`sat_${idx}`, currentPlayhead);
 
       animateCaption(sat.caption, `sat_${idx}`);
@@ -596,7 +593,6 @@ const EcosystemScene = () => {
       "finale",
     );
 
-    // Slower Grand Finale Effects
     tl.to(
       ringRef.current,
       { opacity: 1, scale: 4.5, duration: 1.5, ease: "power2.out" },

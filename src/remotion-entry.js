@@ -6,7 +6,7 @@ const RemotionVideo = () => {
     <Composition
       id="My4KVideo"
       component={MainScene}
-      durationInFrames={2000} // Adjust if you change sequence timings
+      durationInFrames={4400} // Adjust if you change sequence timings
       fps={60}
       width={3840}
       height={2160}
