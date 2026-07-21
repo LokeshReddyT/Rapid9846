@@ -11,14 +11,16 @@
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
-    "@remotion/cli": "^4.0.476",
-    "@remotion/player": "^4.0.476",
+    "@remotion/cli": "4.0.491",
+    "@remotion/google-fonts": "^4.0.495",
+    "@remotion/media": "4.0.491",
+    "@remotion/player": "4.0.491",
     "@tailwindcss/vite": "^4.3.1",
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.18.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "remotion": "4.0.476",
+    "remotion": "4.0.491",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
