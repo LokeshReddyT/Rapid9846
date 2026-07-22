@@ -154,7 +154,7 @@ const Connector = ({
       )}
       {arrow && (
         <polygon
-          points={`0,0 ${-arrowLen},${-arrowHalf} ${-arrowLen},${arrowHalf}`}
+          points={`${arrowLen * 0.4},0 ${-arrowLen * 0.6},${-arrowHalf} ${-arrowLen * 0.6},${arrowHalf}`}
           fill={color}
           opacity={arrowOpacity}
           transform={`translate(${x2}, ${y2}) rotate(${angle}) scale(${arrowScale})`}
@@ -496,7 +496,7 @@ const Scene1 = () => {
           style={{
             fontSize: 90,
             fontWeight: 600,
-            color: COLORS.TextBody,
+            color: "#2563EB",
             ...subEnter.style,
           }}
         >
@@ -614,7 +614,7 @@ export const Scene2 = () => {
           />
 
           <Connector
-            x1={1480}
+            x1={1487}
             y1={800}
             x2={2340}
             y2={800}
@@ -720,12 +720,6 @@ export const Scene2 = () => {
   );
 };
 
-// SCENE 3 — Managing Repairs (Revised)
-
-// 1. New Standalone/Visual Components
-// Note: Created this Plain variant precisely to bypass the baked-in `useEnter` on the standard
-// PersonFigure, ensuring Sara sits perfectly still to bridge continuity from Scene 2, and the
-// Customer can slide linearly without scaling/popping according to the director's notes.
 const PlainPersonFigure = ({
   x,
   y,
@@ -924,15 +918,13 @@ export const Scene3 = () => {
   // BASE COORDINATES
   // ====================
   const Y_BASE = 990;
-  const Y_ABOVE = Y_BASE - 220; // Anchors exactly above the character icons
   const CUST_X_TARGET = 600;
-  const SARA_X = 1830; // Matches Scene 2 layout exactly
+  const SARA_X = 1920;
   const RIGHT_X = 2600;
 
   // Shelf Structure
   const SHELF_X = 3200;
   const SHELF_TOP = 750;
-  // Based on shelf being 600px tall
   const ROW1_Y = SHELF_TOP + 200; // 950
   const ROW2_Y = SHELF_TOP + 400; // 1150
   const ROW3_Y = SHELF_TOP + 600; // 1350
@@ -1034,6 +1026,7 @@ export const Scene3 = () => {
   // ====================
   // POSITIONAL MATH
   // ====================
+  // Shift strictly applies to the items that persist past character fadeouts
   const globalShiftX = interpolate(sShelfShift, [0, 1], [0, -2300], clampBoth);
 
   // Customer slide-in X
@@ -1049,32 +1042,44 @@ export const Scene3 = () => {
   devX = interpolate(sDev2Sara, [0, 1], [devX, SARA_X], clampBoth);
   devX = interpolate(sDev2Right, [0, 1], [devX, RIGHT_X], clampBoth);
   devX = interpolate(sCombo2Shelf, [0, 1], [devX, SHELF_X], clampBoth);
-  devX += globalShiftX; // shifts the rest of the way automatically at the end
+  devX += globalShiftX;
 
-  let devY = Y_ABOVE;
-  devY = interpolate(sDev2Right, [0, 1], [devY, Y_BASE], clampBoth);
-  devY = interpolate(sCombo2Shelf, [0, 1], [devY, ROW2_Y - 50], clampBoth); // Set cleanly on Row 2
+  let devY = Y_BASE - 80; // Default small corner badge height
+  devY = interpolate(sDev2Right, [0, 1], [devY, Y_BASE + 100], clampBoth); // Move precisely to alignment of line & sticky
+  devY = interpolate(sCombo2Shelf, [0, 1], [devY, ROW2_Y - 45], clampBoth);
 
-  let devScale = 0.8;
-  devScale = interpolate(sDev2Right, [0, 1], [devScale, 2.0], clampBoth);
-  devScale = interpolate(sCombo2Shelf, [0, 1], [devScale, 0.7], clampBoth);
+  let devScale = 1; // Start small as Corner Badge
+  devScale = interpolate(sDev2Right, [0, 1], [devScale, 2.0], clampBoth); // Pop to large hero size
+  devScale = interpolate(sCombo2Shelf, [0, 1], [devScale, 0.7], clampBoth); // Match shelf clones
 
   // 2. Sticky tracking
   const stickyEnterOpacity = Math.min(1, Math.max(0, (frame - 380) / 15));
   let stX = RIGHT_X;
-  stX = interpolate(sSticky2Corner, [0, 1], [stX, RIGHT_X + 110], clampBoth);
-  stX = interpolate(sCombo2Shelf, [0, 1], [stX, SHELF_X + 45], clampBoth);
+  stX = interpolate(sStickyUp, [0, 1], [stX, RIGHT_X], clampBoth);
+  stX = interpolate(sSticky2Corner, [0, 1], [stX, RIGHT_X + 75], clampBoth); // Shift cleanly to Top Right corner of the bigger device
+  stX = interpolate(sCombo2Shelf, [0, 1], [stX, SHELF_X + 45], clampBoth); // Shift safely into matched Clone offsets
   stX += globalShiftX;
 
-  let stY = interpolate(sStickyUp, [0, 1], [Y_BASE, Y_BASE - 180], clampBoth);
-  stY = interpolate(sSticky2Corner, [0, 1], [stY, Y_BASE - 100], clampBoth);
-  stY = interpolate(sCombo2Shelf, [0, 1], [stY, ROW2_Y - 90], clampBoth);
+  let stY = Y_BASE + 100; // Perfect alignment with dotted line
+  stY = interpolate(sStickyUp, [0, 1], [stY, Y_BASE - 180], clampBoth); // Move Up
+  stY = interpolate(sSticky2Corner, [0, 1], [stY, Y_BASE - 5], clampBoth); // Bind to top corner of increased device
+  stY = interpolate(sCombo2Shelf, [0, 1], [stY, ROW2_Y - 80], clampBoth); // Shift safely into matched Clone offsets
 
-  let stScale = interpolate(sStickyUp, [0, 1], [1.1, 0.9], clampBoth);
-  stScale = interpolate(sSticky2Corner, [0, 1], [stScale, 0.5], clampBoth);
+  let stScale = 1.0;
+  stScale = interpolate(sStickyUp, [0, 1], [stScale, 0.7], clampBoth);
+  stScale = interpolate(sSticky2Corner, [0, 1], [stScale, 0.35], clampBoth);
   stScale = interpolate(sCombo2Shelf, [0, 1], [stScale, 0.25], clampBoth);
 
-  // 3. Clone Timers
+  // 3. Line Extend calculation
+  // Extends from baseline towards center shelf gracefully (leaving gap right before it)
+  const line2X2 = interpolate(
+    sCombo2Shelf,
+    [0, 1],
+    [RIGHT_X - 150, SHELF_X - 250],
+    clampBoth,
+  );
+
+  // 4. Clone Timers
   const clone1Fade = Math.max(
     0,
     Math.min(1, spring({ frame: frame - 880, fps })),
@@ -1113,7 +1118,6 @@ export const Scene3 = () => {
           transform: "translateX(-50%)",
         }}
       >
-        {/* Main 3-Row Rectangle Rack */}
         <div
           style={{
             width: 360,
@@ -1145,7 +1149,6 @@ export const Scene3 = () => {
         />
       </div>
 
-      {/* Clone 1: Laptop on Row 1 */}
       <div style={{ opacity: clone1Fade }}>
         <DeviceShape
           type="laptop"
@@ -1162,7 +1165,6 @@ export const Scene3 = () => {
         />
       </div>
 
-      {/* Clone 2: PC Box on Row 3 */}
       <div style={{ opacity: clone2Fade }}>
         <DeviceShape
           type="pc"
@@ -1183,7 +1185,6 @@ export const Scene3 = () => {
           LAYER 2: Actors and Connectors
           ========================================= */}
       <div style={actorsExit.style}>
-        {/* Uses translation via parent layout math, skipping intro spring to obey director note */}
         <PlainPersonFigure
           x={custX}
           y={Y_BASE}
@@ -1192,8 +1193,6 @@ export const Scene3 = () => {
           tone="soft"
           opacity={1}
         />
-
-        {/* Present constantly throughout the scene, cleanly continuing her shot from Scene 2 */}
         <PlainPersonFigure
           x={SARA_X}
           y={Y_BASE}
@@ -1203,22 +1202,22 @@ export const Scene3 = () => {
           opacity={1}
         />
 
-        {/* Dynamic Structural Lines; dashed=true & arrow=false aligns with the visual vocabulary for "dotted lines without directionality" */}
         <Connector
           x1={CUST_X_TARGET + 150}
-          y1={Y_BASE}
+          y1={Y_BASE + 100}
           x2={SARA_X - 150}
-          y2={Y_BASE}
+          y2={Y_BASE + 100}
           startFrame={80}
           dashed={true}
           arrow={false}
           color={COLORS.Muted}
         />
+
         <Connector
           x1={SARA_X + 150}
-          y1={Y_BASE}
-          x2={RIGHT_X - 150}
-          y2={Y_BASE}
+          y1={Y_BASE + 100}
+          x2={line2X2}
+          y2={Y_BASE + 100}
           startFrame={360}
           dashed={true}
           arrow={false}
@@ -1254,16 +1253,77 @@ export const Scene3 = () => {
     </AbsoluteFill>
   );
 };
-
 // SCENE 4 — The Loop & Handover
 
-// 1. Scene-specific SVGs & Components
+const DeviceShape4 = ({ type = "mobile" }) => {
+  return (
+    <div>
+      {type === "mobile" && (
+        <svg width={60} height={100} viewBox="0 0 60 100">
+          <rect
+            x="0"
+            y="0"
+            width="60"
+            height="100"
+            rx="8"
+            fill={COLORS.TextBody}
+          />
+          <rect
+            x="4"
+            y="4"
+            width="52"
+            height="80"
+            rx="4"
+            fill={COLORS.Surface}
+          />
+          <circle cx="30" cy="92" r="4" fill={COLORS.Surface} />
+        </svg>
+      )}
+      {type === "laptop" && (
+        <svg width={120} height={80} viewBox="0 0 120 80">
+          <rect
+            x="20"
+            y="0"
+            width="80"
+            height="60"
+            rx="4"
+            fill={COLORS.TextBody}
+          />
+          <rect x="24" y="4" width="72" height="52" fill={COLORS.Surface} />
+          <path d="M0 64 L120 64 L110 80 L10 80 Z" fill={COLORS.Muted} />
+        </svg>
+      )}
+      {type === "pc" && (
+        <svg width={50} height={100} viewBox="0 0 50 100">
+          <rect
+            x="0"
+            y="0"
+            width="50"
+            height="100"
+            rx="2"
+            fill={COLORS.TextBody}
+          />
+          <rect
+            x="15"
+            y="10"
+            width="20"
+            height="4"
+            fill={COLORS.Surface}
+            opacity={0.5}
+          />
+          <circle cx="25" cy="30" r="8" fill={COLORS.Surface} opacity={0.8} />
+          <circle cx="25" cy="80" r="4" fill={COLORS.Surface} opacity={0.5} />
+        </svg>
+      )}
+    </div>
+  );
+};
 
 const StickyNoteS4 = ({ text, opacity = 1 }) => (
   <div
     style={{
       width: 240,
-      height: 240, // Base size, scaled by parent
+      height: 240,
       background: "#FDE047",
       padding: "24px 28px",
       boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
@@ -1275,6 +1335,7 @@ const StickyNoteS4 = ({ text, opacity = 1 }) => (
       whiteSpace: "pre-wrap",
       lineHeight: 1.4,
       opacity,
+      textAlign: "left",
     }}
   >
     {text}
@@ -1317,12 +1378,12 @@ const MoneyIcon = ({ x, y, startFrame, endFrame, targetY }) => {
   const enter = useEnter(startFrame);
   const exit = useExit(endFrame);
 
-  // Drives the vertical flight
   const flight = spring({
     frame: frame - startFrame,
     fps,
     config: { damping: 20, stiffness: 80 },
   });
+
   const currentY = interpolate(flight, [0, 1], [y, targetY], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -1366,7 +1427,9 @@ const MoneyIcon = ({ x, y, startFrame, endFrame, targetY }) => {
   );
 };
 
-// 2. Scene Component
+// ==========================================
+// 2. Scene Engine
+// ==========================================
 const S4_DUR = 1050;
 
 export const Scene4 = () => {
@@ -1375,24 +1438,23 @@ export const Scene4 = () => {
   const clampBoth = { extrapolateLeft: "clamp", extrapolateRight: "clamp" };
 
   // ====================
-  // BASE COORDINATES
+  // BASE COORDINATES (MATHEMATICALLY LOCKED)
   // ====================
-  const Y_BASE = 950; // Central height for actors
-  const Y_CUST = 1550; // Height drop for Customer
-
   const SHELF_X = 900;
   const SHELF_TOP = 750;
-  const ROW1_Y = SHELF_TOP + 200;
-  const ROW2_Y = SHELF_TOP + 400; // 1150
-  const ROW3_Y = SHELF_TOP + 600;
+
+  const ROW1_Y = SHELF_TOP + 200; // 950
+  const ROW2_Y = SHELF_TOP + 400; // 1150 (True horizon line across Shelf, Tech, and Sara)
+  const ROW3_Y = SHELF_TOP + 600; // 1350
 
   const TECH_X = 1750;
   const SARA_X = 2600;
 
+  const Y_CUST = ROW2_Y + 500; // 1650 (Cleanly below Sara)
+
   // ====================
   // GLOBAL TIMERS
   // ====================
-  // Device Travel phases
   const pDev2Tech = Math.max(
     0,
     Math.min(
@@ -1454,35 +1516,45 @@ export const Scene4 = () => {
     ),
   );
 
+  // Springs for Smooth Floating Status Icons (Over Technician)
+  const setOn = Math.max(
+    0,
+    Math.min(1, spring({ frame: frame - 230, fps, config: { damping: 14 } })),
+  );
+  const setOff = Math.max(
+    0,
+    Math.min(1, spring({ frame: frame - 310, fps, config: { damping: 14 } })),
+  );
+  const setScale = setOn - setOff;
+
+  const tickOn = Math.max(
+    0,
+    Math.min(1, spring({ frame: frame - 320, fps, config: { damping: 14 } })),
+  );
+  const tickOff = Math.max(
+    0,
+    Math.min(1, spring({ frame: frame - 400, fps, config: { damping: 14 } })),
+  );
+  const tickScale = tickOn - tickOff;
+
   const sceneExit = useExit(990);
 
   // ====================
-  // ADDITIVE POSITIONAL MATH
+  // MOBILE + STICKY OVERHEAD TRACKER
   // ====================
-  // Cleanly accumulates deltas to prevent snapping between multi-leg transits
+  // Traces precisely overhead forming "Top Middle" positioning
+  let devX = SHELF_X;
+  devX = interpolate(pDev2Tech, [0, 1], [devX, TECH_X], clampBoth);
+  devX = interpolate(pDev2Sara, [0, 1], [devX, SARA_X], clampBoth);
+  devX = interpolate(pDevRight, [0, 1], [devX, SARA_X + 350], clampBoth); // Move to the right of cust later
 
-  const devX =
-    900 +
-    interpolate(pDev2Tech, [0, 1], [0, TECH_X - 900], clampBoth) +
-    interpolate(pDev2Sara, [0, 1], [0, SARA_X - TECH_X], clampBoth) +
-    interpolate(pDevRight, [0, 1], [0, 450], clampBoth); // shifts right ~450px from Cust
+  let devY = ROW2_Y - 45; // Base shelf height
+  devY = interpolate(pDev2Tech, [0, 1], [devY, ROW2_Y - 170], clampBoth); // Flies up to hover over Tech exactly
+  devY = interpolate(pDev2Cust, [0, 1], [devY, Y_CUST - 170], clampBoth); // Arcs down to hover over Cust exactly
+  devY = interpolate(pDevRight, [0, 1], [devY, Y_CUST - 40], clampBoth); // Settles softly downwards
 
-  const devY =
-    ROW2_Y -
-    50 +
-    interpolate(
-      pDev2Tech,
-      [0, 1],
-      [0, Y_BASE - 220 - (ROW2_Y - 50)],
-      clampBoth,
-    ) +
-    interpolate(pDev2Cust, [0, 1], [0, Y_CUST - (Y_BASE - 220)], clampBoth);
-
-  const devScale =
-    0.7 +
-    interpolate(pDev2Tech, [0, 1], [0, 0.1], clampBoth) + // scales up to 0.8 at tech
-    interpolate(pDev2Cust, [0, 1], [0, 0.2], clampBoth) + // scales up to 1.0 at handoff
-    interpolate(pDevRight, [0, 1], [0, 1.2], clampBoth); // blows up to 2.2 at final settling
+  let devScale = 0.7; // Constant through travel matching clones
+  devScale = interpolate(pDevRight, [0, 1], [devScale, 1.2], clampBoth); // Enlarges when presented at end
 
   const dynamicStickyOpacity = interpolate(
     pStickyFade,
@@ -1506,8 +1578,10 @@ export const Scene4 = () => {
         phase={80}
       />
 
+      <SceneHeading title="Managing Repairs" />
+
       {/* =========================================
-          LAYER 1: The Static Preserved Shelf
+          LAYER 1: Static Shelf & Clones
           ========================================= */}
       <div
         style={{
@@ -1550,30 +1624,31 @@ export const Scene4 = () => {
       </div>
 
       <div style={sceneExit.style}>
-        {/* Clone 1 */}
+        {/* Row 1 Clone */}
         <div
           style={{
             position: "absolute",
             left: SHELF_X,
-            top: ROW1_Y - 35,
+            top: ROW1_Y - 45,
             transform: "translate(-50%, -50%) scale(0.8)",
           }}
         >
-          <DeviceShape type="laptop" />
+          <DeviceShape4 type="laptop" />
         </div>
         <div
           style={{
             position: "absolute",
-            left: SHELF_X + 50,
+            left: SHELF_X + 45,
             top: ROW1_Y - 70,
-            transform: "translate(-50%, -50%) scale(0.25)",
+            transform: "translate(-50%, -50%) scale(0.22)",
           }}
         >
           <StickyNoteS4
             text="Client: John&#10;Fix: OS"
           />
         </div>
-        {/* Clone 3 */}
+
+        {/* Row 3 Clone */}
         <div
           style={{
             position: "absolute",
@@ -1582,14 +1657,14 @@ export const Scene4 = () => {
             transform: "translate(-50%, -50%) scale(0.7)",
           }}
         >
-          <DeviceShape type="pc" />
+          <DeviceShape4 type="pc" />
         </div>
         <div
           style={{
             position: "absolute",
-            left: SHELF_X + 40,
-            top: ROW3_Y - 80,
-            transform: "translate(-50%, -50%) scale(0.25)",
+            left: SHELF_X + 25,
+            top: ROW3_Y - 70,
+            transform: "translate(-50%, -50%) scale(0.22)",
           }}
         >
           <StickyNoteS4
@@ -1599,39 +1674,47 @@ export const Scene4 = () => {
       </div>
 
       {/* =========================================
-          LAYER 2: Structural Lines & Flow Badges
+          LAYER 2: Structural Lines (Mathematical Dead Center)
           ========================================= */}
       <div style={sceneExit.style}>
+        {/* Horizontal span connecting directly on ROW2_Y */}
         <Connector
-          x1={SHELF_X + 180}
-          y1={Y_BASE}
-          x2={TECH_X - 120}
-          y2={Y_BASE}
+          x1={SHELF_X + 220}
+          y1={ROW2_Y}
+          x2={TECH_X - 150}
+          y2={ROW2_Y}
           startFrame={40}
           dashed={true}
           color={COLORS.Muted}
         />
         <Connector
-          x1={TECH_X + 120}
-          y1={Y_BASE}
-          x2={SARA_X - 120}
-          y2={Y_BASE}
+          x1={TECH_X + 150}
+          y1={ROW2_Y}
+          x2={SARA_X - 150}
+          y2={ROW2_Y}
           startFrame={380}
           dashed={true}
           color={COLORS.Muted}
         />
+
+        {/* Vertical Drop. (+0.1 on x2 forces SVG bounding box width to prevent native geometric collapsing display bugs on 0-width vertical SVGs) */}
         <Connector
           x1={SARA_X}
-          y1={Y_BASE + 180}
-          x2={SARA_X}
-          y2={Y_CUST - 180}
+          y1={ROW2_Y + 150}
+          x2={SARA_X + 0.1}
+          y2={Y_CUST - 150}
           startFrame={560}
           dashed={true}
           color={COLORS.Muted}
         />
 
-        {/* Informing transit text */}
-        <div style={{ position: "absolute", left: 2175, top: Y_BASE - 40 }}>
+        <div
+          style={{
+            position: "absolute",
+            left: SARA_X - 400,
+            top: ROW2_Y - 280,
+          }}
+        >
           <MessageBubbleS4 text={"Informing"} startFrame={500} endFrame={580} />
         </div>
 
@@ -1640,15 +1723,15 @@ export const Scene4 = () => {
           <div
             style={{
               position: "absolute",
-              left: 2600,
+              left: SARA_X,
               top: interpolate(
                 pCallingFly,
                 [0, 1],
-                [Y_BASE + 200, Y_CUST - 200],
+                [ROW2_Y + 150, Y_CUST - 150],
                 clampBoth,
               ),
               transform: "translate(-50%, -50%) scale(0.8)",
-              opacity: 1 - Math.max(0, (frame - 695) / 15), // small manual fade on landing
+              opacity: 1 - Math.max(0, (frame - 695) / 15),
             }}
           >
             <IconBadge
@@ -1669,40 +1752,41 @@ export const Scene4 = () => {
 
       {/* =========================================
           LAYER 3: Actors
-          ========================================= */}
+           ========================================= */}
       <div style={sceneExit.style}>
         <PersonFigure
-          x={TECH_X}
-          y={Y_BASE}
+          x={TECH_X - 90}
+          y={ROW2_Y - 90}
           label="Technician"
           color={COLORS.Cyan}
           delayFrames={80}
         />
         <PersonFigure
-          x={SARA_X}
-          y={Y_BASE}
+          x={SARA_X - 90}
+          y={ROW2_Y - 90}
           label="Sara"
           color={COLORS.Rose}
           tone="solid"
           delayFrames={420}
         />
         <PersonFigure
-          x={SARA_X}
-          y={Y_CUST}
+          x={SARA_X - 90}
+          y={Y_CUST - 90}
           label="Customer"
           color={COLORS.Purple}
           tone="soft"
           delayFrames={600}
         />
 
-        {/* Floating Icons Over Tech */}
-        {frame >= 230 && frame < 310 && (
+        {/* Floating Icons Over Tech (Smooth Spring Scaling) */}
+        {setScale > 0 && (
           <div
             style={{
               position: "absolute",
-              left: TECH_X,
-              top: Y_BASE - 360,
-              transform: "translate(-50%, -50%) scale(0.6)",
+              left: TECH_X + 90,
+              top: ROW2_Y - 140,
+              transform: `translate(-50%, -50%) scale(${setScale * 0.55})`,
+              opacity: Math.min(1, setScale * 1.5),
             }}
           >
             <IconBadge
@@ -1718,13 +1802,15 @@ export const Scene4 = () => {
             />
           </div>
         )}
-        {frame >= 310 && frame < 390 && (
+
+        {tickScale > 0 && (
           <div
             style={{
               position: "absolute",
-              left: TECH_X,
-              top: Y_BASE - 360,
-              transform: "translate(-50%, -50%) scale(0.6)",
+              left: TECH_X + 90,
+              top: ROW2_Y - 140,
+              transform: `translate(-50%, -50%) scale(${tickScale * 0.55})`,
+              opacity: Math.min(1, tickScale * 1.5),
             }}
           >
             <IconBadge
@@ -1743,7 +1829,7 @@ export const Scene4 = () => {
       </div>
 
       {/* =========================================
-          LAYER 4: The Traveling Device (+ Sticky nested safely inside so they can't desync)
+          LAYER 4: Traveling Nested Device/Sticky Asset
           ========================================= */}
       <div
         style={{
@@ -1754,7 +1840,6 @@ export const Scene4 = () => {
           ...sceneExit.style,
         }}
       >
-        {/* Core Mobile */}
         <div
           style={{
             position: "absolute",
@@ -1763,16 +1848,15 @@ export const Scene4 = () => {
             transform: "translate(-50%, -50%)",
           }}
         >
-          <DeviceShape type="mobile" />
+          <DeviceShape4 type="mobile" />
         </div>
 
-        {/* Attached Sticky Note - stays fixed relative to the mobile, only varies its own opacity */}
         <div
           style={{
             position: "absolute",
             left: 45,
             top: -15,
-            transform: "translate(-50%, -50%) scale(0.35)",
+            transform: "translate(-50%, -50%) scale(0.22)",
           }}
         >
           <StickyNoteS4
@@ -1788,9 +1872,9 @@ export const Scene4 = () => {
       <div style={sceneExit.style}>
         {frame > 730 && frame < 850 && (
           <MoneyIcon
-            x={SARA_X + 110}
+            x={SARA_X + 220} // Bumped further from the settling phone
             y={Y_CUST}
-            targetY={Y_BASE + 70}
+            targetY={ROW2_Y + 70}
             startFrame={730}
             endFrame={820}
           />
@@ -2242,7 +2326,7 @@ export const Scene6 = () => {
         sceneDuration={S6_DUR}
         phase={120}
       />
-
+      <SceneHeading title="The Problems" />
       <div style={fullSceneExit.style}>
         {/* ==============================
             LEFT: SARA
@@ -2757,8 +2841,8 @@ export const Scene7 = () => {
         <SceneHeading title="Time for a Change" />
 
         <PersonFigure
-          x={1920}
-          y={1500}
+          x={1760}
+          y={1050}
           label="Sara"
           color={COLORS.Rose}
           tone="solid"
@@ -2799,6 +2883,7 @@ const ModernLaptopMockup = ({ startFrame, children, highlightScale }) => {
         height: 680,
         transform: `translate(-50%, -50%) scale(${highlightScale}) ${enter.style.transform}`,
         opacity: enter.style.opacity,
+        zIndex: 10,
       }}
     >
       {/* Screen Frame */}
@@ -2988,6 +3073,7 @@ export const Scene8 = () => {
         color={COLORS.Primary}
         sceneDuration={S8_DUR}
       />
+      <SceneHeading title="Updated Setup" />
       <AmbientGlow
         corner="bottomRight"
         color={COLORS.Cyan}
@@ -2995,7 +3081,7 @@ export const Scene8 = () => {
         phase={80}
       />
 
-      <div style={sceneExit.style}>
+      <div style={{ position: "relative", zIndex: 10 }}>
         {/* ==============================
             CENTRAL APP
             ============================== */}
@@ -3010,6 +3096,7 @@ export const Scene8 = () => {
               display: "flex",
               alignItems: "center",
               gap: 16,
+              zIndex: 20,
             }}
           >
             <div
@@ -3157,14 +3244,14 @@ export const Scene8 = () => {
             }}
           >
             <PersonFigure
-              x={0}
-              y={0}
+              x={-50}
+              y={-100}
               label="Sara"
               color={COLORS.Rose}
               tone="solid"
               delayFrames={140}
             />
-            <div style={{ position: "absolute", left: 0, top: -110 }}>
+            <div style={{ position: "absolute", left: 27, top: -126 }}>
               <MessageBubbleS8
                 text="Live visibility"
                 startFrame={820}
@@ -3177,19 +3264,19 @@ export const Scene8 = () => {
           <div
             style={{
               position: "absolute",
-              left: 3240,
-              top: 900,
+              left: 3124,
+              top: 907,
               transform: `scale(${techScale})`,
             }}
           >
             <PersonFigure
               x={0}
-              y={0}
+              y={-100}
               label="Technician"
               color={COLORS.Cyan}
               delayFrames={380}
             />
-            <div style={{ position: "absolute", left: 0, top: -110 }}>
+            <div style={{ position: "absolute", left: 90, top: -131 }}>
               <MessageBubbleS8
                 text="Focus on work"
                 startFrame={900}
@@ -3203,7 +3290,7 @@ export const Scene8 = () => {
                 style={{
                   position: "absolute",
                   left: 0,
-                  top: -230,
+                  top: -300,
                   transform: "translate(-50%, -50%) scale(0.6)",
                 }}
               >
@@ -3322,45 +3409,6 @@ export const Scene8 = () => {
 // SCENE 9 — The Path Forward (Conclusion)
 
 // 1. Scene-Specific UI Components
-const ConceptCard = ({
-  x,
-  y,
-  title,
-  color = "#1E293B",
-  delayFrames,
-  opacity = 1,
-}) => {
-  const enter = useEnter(delayFrames);
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: x,
-        top: y,
-        transform: `translate(-50%, -50%) ${enter.style.transform}`,
-        opacity: enter.style.opacity * opacity,
-        zIndex: 10,
-      }}
-    >
-      <div
-        style={{
-          padding: "30px 60px",
-          background: COLORS.Surface,
-          borderRadius: 20,
-          fontSize: 60,
-          fontWeight: 700,
-          fontFamily: "Quicksand",
-          color: color,
-          boxShadow: "0 20px 50px rgba(15,23,42,0.1)",
-          border: `4px solid ${color}20`,
-          whiteSpace: "nowrap",
-        }}
-      >
-        {title}
-      </div>
-    </div>
-  );
-};
 
 const PathBadge = ({
   x,
@@ -3416,7 +3464,7 @@ const CustomArrowHead = ({ x, y, angle, clampedProgress, color }) => {
   const arrowHalf = 19;
   return (
     <polygon
-      points={`0,0 ${-arrowLen},${-arrowHalf} ${-arrowLen},${arrowHalf}`}
+      points={`${arrowLen * 0.4},0 ${-arrowLen * 0.6},${-arrowHalf} ${-arrowLen * 0.6},${arrowHalf}`}
       fill={color}
       opacity={opacity}
       transform={`translate(${x}, ${y}) rotate(${angle}) scale(${scale})`}
@@ -3558,14 +3606,14 @@ export const Scene9 = () => {
             THE NODES (Problem & Solution)
             ============================== */}
         <ConceptCard
-          x={START_X}
+          x={START_X - 195}
           y={BASE_Y}
           title="Problem"
           color={COLORS.Danger}
           delayFrames={40}
         />
         <ConceptCard
-          x={END_X}
+          x={END_X + 195}
           y={BASE_Y}
           title="Solution"
           color={COLORS.Success}
@@ -3733,7 +3781,7 @@ export const Scene9 = () => {
               whiteSpace: "nowrap",
             }}
           >
-            Evaluating App Architectures
+            Different Options to Build Apps
           </div>
         </div>
       </div>
@@ -3755,10 +3803,8 @@ export const MainVideo = () => {
           @import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap");
         `}
       </style>
-
       {/* Persistent Audio Track */}
       <Audio src={staticFile("hi.wav")} />
-
       {/* Scenes */}
       <Sequence from={S1_START} durationInFrames={S1_DUR}>
         <Scene1 />

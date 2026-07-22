@@ -12,7 +12,7 @@
   "dependencies": {
     "@gsap/react": "^2.1.2",
     "@remotion/cli": "4.0.491",
-    "@remotion/google-fonts": "^4.0.495",
+    "@remotion/google-fonts": "^4.0.491",
     "@remotion/media": "4.0.491",
     "@remotion/player": "4.0.491",
     "@tailwindcss/vite": "^4.3.1",
